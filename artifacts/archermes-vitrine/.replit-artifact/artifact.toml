@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "ARCHERMES-Vitrine"
+version = "1.0.0"
+id = "artifacts/archermes-vitrine"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 22808
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/archermes-vitrine run dev"
+
+[services.env]
+PORT = "22808"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/archermes-vitrine", "run", "build"]
+publicDir = "artifacts/archermes-vitrine/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
