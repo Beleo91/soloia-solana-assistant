@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #05070f;
+  color: #e0e8f0;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+.container-principal {
+  min-height: 100vh;
+  background: linear-gradient(160deg, #05070f 0%, #0a0d1a 50%, #05070f 100%);
+}
+
+/* ─── HEADER ─── */
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2.5rem;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.12);
+  background: rgba(5, 7, 15, 0.85);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.cabecalho h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  color: #00e5ff;
+  text-shadow: 0 0 18px rgba(0, 229, 255, 0.6), 0 0 40px rgba(0, 229, 255, 0.2);
+}
+
+.btn-login {
+  background: linear-gradient(135deg, #00e5ff, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 0.65rem 1.5rem;
+  border-radius: 0.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
+}
+
+.btn-login:hover {
+  opacity: 0.85;
+  box-shadow: 0 0 28px rgba(0, 229, 255, 0.55);
+}
+
+.painel-usuario {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  color: #00e5ff;
+}
+
+/* ─── FEATURED / SPONSORED ─── */
+.area-patrocinada {
+  padding: 3.5rem 2.5rem 2.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.area-patrocinada h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.05em;
+}
+
+.subtitulo {
+  color: #7a8fa6;
+  font-size: 0.9rem;
+  margin-bottom: 1.75rem;
+}
+
+.carrossel-anuncios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.card-destaque {
+  position: relative;
+  background: linear-gradient(145deg, rgba(15, 20, 40, 0.9), rgba(10, 13, 26, 0.95));
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 1rem;
+  overflow: hidden;
+  transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+
+.card-destaque:hover {
+  transform: translateY(-4px);
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 229, 255, 0.15);
+}
+
+.card-destaque img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+  background: linear-gradient(135deg, #0d1a2e, #1a0d2e);
+}
+
+.card-destaque h3 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e0e8f0;
+  padding: 0.9rem 1rem 0.25rem;
+  letter-spacing: 0.04em;
+}
+
+.card-destaque p {
+  color: #7a8fa6;
+  font-size: 0.8rem;
+  padding: 0 1rem 1rem;
+}
+
+.tag-patrocinado {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  background: rgba(124, 58, 237, 0.85);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.3rem;
+  backdrop-filter: blur(4px);
+}
+
+/* ─── CATEGORIES ─── */
+.area-nichos {
+  padding: 2.5rem 2.5rem 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.area-nichos h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+.grid-categorias {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.btn-nicho {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 20, 40, 0.8);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  color: #c8d8e8;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+  text-align: left;
+}
+
+.btn-nicho:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.4);
+  color: #00e5ff;
+  box-shadow: 0 4px 16px rgba(0, 229, 255, 0.1);
+}
+
+.icone {
+  font-size: 1.3rem;
+  line-height: 1;
+}
