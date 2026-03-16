@@ -4,7 +4,7 @@ import HomePage from './HomePage';
 function App() {
   return (
     <PrivyProvider
-      appId="SEU_ID_DO_PRIVY_AQUI"
+      appId="cmmttjv0y01n10dk0bt0hr1py"
       config={{
         loginMethods: ['email', 'google', 'sms'],
         appearance: {
