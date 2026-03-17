@@ -120,12 +120,12 @@ function HomePage() {
                   </div>
 
                   <div className="campo">
-                    <label htmlFor="preco">Preço (ETH / Moedas)</label>
+                    <label htmlFor="preco">Preço (USDC)</label>
                     <input
                       id="preco"
                       name="preco"
                       type="number"
-                      placeholder="Ex: 0.05"
+                      placeholder="Ex: 25.00"
                       step="0.0001"
                       min="0"
                       value={form.preco}
