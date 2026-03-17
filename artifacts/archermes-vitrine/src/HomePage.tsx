@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, parseUnits } from 'ethers';
-import { arcTestnet } from './App';
+import { arcTestnet } from './chains';
 import './Home.css';
 
 // ──────────────────────────────────────────────────────────
