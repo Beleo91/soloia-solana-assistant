@@ -1,10 +1,26 @@
 import { useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { BrowserProvider, Contract, parseUnits } from 'ethers';
 import './Home.css';
 
 // ──────────────────────────────────────────────────────────
-// Cole o endereço do seu contrato do Remix aqui:
+// Endereço do contrato no Remix / rede ARC test:
 const CONTRACT_ADDRESS = '0x741aA13E978Abf28080Cc04E9dbcf8705aCb7787';
+
+// ABI mínimo — apenas a função listItem
+const CONTRACT_ABI = [
+  {
+    inputs: [
+      { internalType: 'string',  name: 'name',     type: 'string'  },
+      { internalType: 'uint256', name: 'price',    type: 'uint256' },
+      { internalType: 'string',  name: 'imageUrl', type: 'string'  },
+    ],
+    name: 'listItem',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+];
 // ──────────────────────────────────────────────────────────
 
 interface FormData {
@@ -13,34 +29,67 @@ interface FormData {
   linkImagem: string;
 }
 
+type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro';
+
 function HomePage() {
   const { login, authenticated, user } = usePrivy();
+  const { wallets } = useWallets();
 
   const [modalAberto, setModalAberto] = useState(false);
-  const [enviado, setEnviado] = useState(false);
+  const [estado, setEstado] = useState<Estado>('idle');
+  const [txHash, setTxHash] = useState('');
+  const [erroMsg, setErroMsg] = useState('');
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', linkImagem: '' });
 
   function abrirModal() {
-    setEnviado(false);
+    setEstado('idle');
+    setTxHash('');
+    setErroMsg('');
     setForm({ nomeItem: '', preco: '', linkImagem: '' });
     setModalAberto(true);
   }
 
   function fecharModal() {
     setModalAberto(false);
-    setEnviado(false);
+    setEstado('idle');
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  function handlePublicar(e: React.FormEvent) {
+  async function handlePublicar(e: React.FormEvent) {
     e.preventDefault();
-    // Futuramente: interagir com CONTRACT_ADDRESS via ethers.js / wagmi
-    console.log('Contrato:', CONTRACT_ADDRESS);
-    console.log('Dados do produto:', form);
-    setEnviado(true);
+    setEstado('enviando');
+    setErroMsg('');
+
+    try {
+      // Pega a primeira carteira disponível (embedded ou externa)
+      const wallet = wallets[0];
+      if (!wallet) throw new Error('Nenhuma carteira conectada. Faça login novamente.');
+
+      // Cria o provider e signer via Privy
+      const eip1193 = await wallet.getEthereumProvider();
+      const provider = new BrowserProvider(eip1193);
+      const signer = await provider.getSigner();
+
+      // Instancia o contrato
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      // USDC tem 6 casas decimais
+      const precoUsdc = parseUnits(form.preco, 6);
+
+      // Chama listItem — a carteira Privy pedirá confirmação
+      const tx = await contrato.listItem(form.nomeItem, precoUsdc, form.linkImagem);
+      await tx.wait(); // aguarda mineração
+
+      setTxHash(tx.hash);
+      setEstado('sucesso');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setErroMsg(msg.length > 120 ? msg.slice(0, 120) + '…' : msg);
+      setEstado('erro');
+    }
   }
 
   return (
@@ -96,7 +145,8 @@ function HomePage() {
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <button className="modal-fechar" onClick={fecharModal} aria-label="Fechar">✕</button>
 
-            {!enviado ? (
+            {/* ── FORMULÁRIO ── */}
+            {estado === 'idle' || estado === 'erro' ? (
               <>
                 <div className="modal-topo">
                   <span className="modal-icone">⬡</span>
@@ -108,28 +158,20 @@ function HomePage() {
                   <div className="campo">
                     <label htmlFor="nomeItem">Nome do Item</label>
                     <input
-                      id="nomeItem"
-                      name="nomeItem"
-                      type="text"
+                      id="nomeItem" name="nomeItem" type="text"
                       placeholder="Ex: Tênis Air Max Limited"
-                      value={form.nomeItem}
-                      onChange={handleChange}
-                      required
-                      autoComplete="off"
+                      value={form.nomeItem} onChange={handleChange}
+                      required autoComplete="off"
                     />
                   </div>
 
                   <div className="campo">
                     <label htmlFor="preco">Preço (USDC)</label>
                     <input
-                      id="preco"
-                      name="preco"
-                      type="number"
+                      id="preco" name="preco" type="number"
                       placeholder="Ex: 25.00"
-                      step="0.0001"
-                      min="0"
-                      value={form.preco}
-                      onChange={handleChange}
+                      step="0.000001" min="0"
+                      value={form.preco} onChange={handleChange}
                       required
                     />
                   </div>
@@ -137,19 +179,23 @@ function HomePage() {
                   <div className="campo">
                     <label htmlFor="linkImagem">Link da Imagem</label>
                     <input
-                      id="linkImagem"
-                      name="linkImagem"
-                      type="text"
+                      id="linkImagem" name="linkImagem" type="text"
                       placeholder="https://..."
-                      value={form.linkImagem}
-                      onChange={handleChange}
+                      value={form.linkImagem} onChange={handleChange}
                       required
                     />
                   </div>
 
                   {form.linkImagem && (
                     <div className="preview-imagem">
-                      <img src={form.linkImagem} alt="Preview" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <img src={form.linkImagem} alt="Preview"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
+                  )}
+
+                  {estado === 'erro' && (
+                    <div className="modal-erro">
+                      ⚠️ {erroMsg}
                     </div>
                   )}
 
@@ -158,19 +204,25 @@ function HomePage() {
                   </button>
                 </form>
               </>
+            ) : estado === 'enviando' ? (
+              /* ── AGUARDANDO CONFIRMAÇÃO ── */
+              <div className="modal-sucesso">
+                <div className="sucesso-icone spinner">⟳</div>
+                <h2>Aguardando confirmação...</h2>
+                <p>A carteira vai pedir sua autorização.<br />Confirme a transação para continuar.</p>
+              </div>
             ) : (
+              /* ── SUCESSO BLOCKCHAIN ── */
               <div className="modal-sucesso">
                 <div className="sucesso-icone">✓</div>
-                <h2>Produto Publicado!</h2>
-                <p>
-                  <strong>{form.nomeItem}</strong> foi enviado ao marketplace com sucesso.
-                </p>
-                {CONTRACT_ADDRESS && (
-                  <p className="contrato-info">Contrato: <code>{CONTRACT_ADDRESS.slice(0, 10)}…</code></p>
+                <h2>Produto postado na Blockchain!</h2>
+                <p><strong>{form.nomeItem}</strong> foi listado com sucesso no marketplace.</p>
+                {txHash && (
+                  <p className="contrato-info">
+                    TX: <code title={txHash}>{txHash.slice(0, 12)}…{txHash.slice(-6)}</code>
+                  </p>
                 )}
-                <button onClick={fecharModal} className="btn-publicar">
-                  Fechar
-                </button>
+                <button onClick={fecharModal} className="btn-publicar">Fechar</button>
               </div>
             )}
           </div>
