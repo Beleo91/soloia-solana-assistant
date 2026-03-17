@@ -204,3 +204,226 @@ body {
   font-size: 1.3rem;
   line-height: 1;
 }
+
+/* ─── ANUNCIAR BUTTON (header, authenticated) ─── */
+.btn-anunciar {
+  background: transparent;
+  border: 1px solid rgba(0, 229, 255, 0.5);
+  color: #00e5ff;
+  padding: 0.5rem 1.1rem;
+  border-radius: 0.5rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.btn-anunciar:hover {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: #00e5ff;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
+}
+
+/* ─── MODAL OVERLAY ─── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+/* ─── MODAL BOX ─── */
+.modal-box {
+  position: relative;
+  background: linear-gradient(145deg, #0c1022, #101828);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 1.25rem;
+  padding: 2.25rem 2rem 2rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 0 60px rgba(0, 229, 255, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6);
+  animation: modalEntrar 0.22s ease;
+}
+
+@keyframes modalEntrar {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+.modal-fechar {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #7a8fa6;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.modal-fechar:hover {
+  background: rgba(255,255,255,0.12);
+  color: #e0e8f0;
+}
+
+/* ─── MODAL HEADER ─── */
+.modal-topo {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+.modal-icone {
+  display: inline-block;
+  font-size: 2rem;
+  color: #00e5ff;
+  text-shadow: 0 0 16px rgba(0, 229, 255, 0.6);
+  margin-bottom: 0.5rem;
+}
+.modal-topo h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.35rem;
+}
+.modal-topo p {
+  font-size: 0.82rem;
+  color: #7a8fa6;
+}
+
+/* ─── FORM FIELDS ─── */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.campo label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8aa8c0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.campo input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  color: #e0e8f0;
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.campo input::placeholder {
+  color: #3a4f63;
+}
+.campo input:focus {
+  border-color: rgba(0, 229, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.08);
+}
+
+/* ─── IMAGE PREVIEW ─── */
+.preview-imagem {
+  border-radius: 0.6rem;
+  overflow: hidden;
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  max-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.3);
+}
+.preview-imagem img {
+  width: 100%;
+  max-height: 140px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ─── PUBLISH BUTTON ─── */
+.btn-publicar {
+  margin-top: 0.25rem;
+  width: 100%;
+  background: linear-gradient(135deg, #00e5ff, #7c3aed);
+  color: #fff;
+  border: none;
+  padding: 0.85rem 1rem;
+  border-radius: 0.65rem;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+}
+.btn-publicar:hover {
+  opacity: 0.88;
+  box-shadow: 0 0 32px rgba(0, 229, 255, 0.4);
+}
+
+/* ─── SUCCESS STATE ─── */
+.modal-sucesso {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+.sucesso-icone {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00e5ff22, #7c3aed22);
+  border: 2px solid #00e5ff;
+  color: #00e5ff;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.35);
+}
+.modal-sucesso h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.15rem;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+}
+.modal-sucesso p {
+  font-size: 0.88rem;
+  color: #8aa8c0;
+}
+.modal-sucesso strong {
+  color: #e0e8f0;
+}
+.contrato-info {
+  font-size: 0.75rem;
+  color: #4a6880;
+}
+.contrato-info code {
+  color: #00e5ff;
+  font-family: monospace;
+}
