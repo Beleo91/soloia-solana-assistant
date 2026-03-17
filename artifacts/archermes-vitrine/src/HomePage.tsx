@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, parseUnits } from 'ethers';
+import { arcTestnet } from './App';
 import './Home.css';
 
 // ──────────────────────────────────────────────────────────
@@ -66,6 +67,9 @@ function HomePage() {
     try {
       const wallet = wallets[0];
       if (!wallet) throw new Error('Nenhuma carteira conectada. Faça login novamente.');
+
+      // Garante que a carteira está na Arc Testnet
+      await wallet.switchChain(arcTestnet.id);
 
       // Obtém o provider EIP-1193 da carteira Privy
       const eip1193 = await wallet.getEthereumProvider();
