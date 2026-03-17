@@ -11,7 +11,7 @@ function App() {
     <PrivyProvider
       appId="cmmttjv0y01n10dk0bt0hr1py"
       config={{
-        loginMethods: ['email', 'wallet', 'sms'],
+        loginMethods: ['email', 'wallet', 'sms', 'google'],
         appearance: {
           theme: 'dark',
           accentColor: '#676FFF',
