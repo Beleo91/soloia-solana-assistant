@@ -33,7 +33,7 @@ function App() {
         loginMethods: ['email', 'google', 'sms', 'wallet'],
         appearance: {
           theme: 'dark',
-          logo: 'https://seusite.com/logo-archermes.png',
+          logo: '/images/logo-ahs.png',
           walletChainType: 'ethereum-only',
         },
         defaultChain: arcTestnet,

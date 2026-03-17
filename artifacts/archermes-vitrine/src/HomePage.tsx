@@ -98,7 +98,10 @@ function HomePage() {
   return (
     <div className="container-principal">
       <header className="cabecalho">
-        <h1>ARCHERMES</h1>
+        <div className="logo-wrapper">
+          <img src="/images/logo-ahs.png" alt="ARCHERMES" className="logo-img" />
+          <span className="logo-texto">ARCHERMES</span>
+        </div>
         {!authenticated ? (
           <button onClick={login} className="btn-login">
             Entrar / Criar Minha Loja
