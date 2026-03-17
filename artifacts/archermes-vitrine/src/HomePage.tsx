@@ -32,7 +32,7 @@ interface FormData {
 type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro';
 
 function HomePage() {
-  const { login, authenticated, user } = usePrivy();
+  const { login, logout, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
 
   const [modalAberto, setModalAberto] = useState(false);
@@ -104,6 +104,9 @@ function HomePage() {
             <span>Olá, {user?.email ? user.email.address : 'Vendedor'}!</span>
             <button onClick={abrirModal} className="btn-anunciar">
               + Anunciar Produto
+            </button>
+            <button onClick={() => logout()} className="btn-sair">
+              Sair
             </button>
           </div>
         )}
