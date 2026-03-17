@@ -6,7 +6,7 @@ function App() {
     <PrivyProvider
       appId="cmmttjv0y01n10dk0bt0hr1py"
       config={{
-        loginMethods: ['email', 'google', 'sms'],
+        loginMethods: ['email', 'google', 'sms', 'wallet'],
         appearance: {
           theme: 'light',
           logo: 'https://seusite.com/logo-archermes.png',

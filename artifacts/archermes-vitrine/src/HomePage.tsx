@@ -4,7 +4,7 @@ import './Home.css';
 
 // ──────────────────────────────────────────────────────────
 // Cole o endereço do seu contrato do Remix aqui:
-const CONTRACT_ADDRESS = '';
+const CONTRACT_ADDRESS = '0x741aA13E978Abf28080Cc04E9dbcf8705aCb7787';
 // ──────────────────────────────────────────────────────────
 
 interface FormData {
