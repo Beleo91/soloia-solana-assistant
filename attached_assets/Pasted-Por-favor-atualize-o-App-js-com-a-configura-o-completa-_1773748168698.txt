@@ -1,0 +1,57 @@
+Por favor, atualize o `App.js` com a configuração completa e os dados reais da rede **Arc Testnet** que forneci. O visual dark/neon do site deve ser mantido.
+
+O problema principal é estrutural: `usePrivy()` está sendo chamado dentro de `App.js`, mas `App.js` é onde o `PrivyProvider` é definido. A lógica de login (`usePrivy`) deve ficar dentro de um componente filho, como o `HomePage.js`.
+
+Aqui está o código completo e corrigido para o `App.js`:
+
+```javascript
+import React from 'react';
+import { PrivyProvider } from '@privy-io/react-auth';
+import HomePage from './HomePage';
+import './style.css';
+
+function App() {
+  const appId = 'cm15p6w2b0058b8rdr96q78u6'; // ID do Privy
+
+  // Configuração obrigatória para carteiras (WalletConnect)
+  const walletConnectOptions = {
+    projectId: 'e010a30b621481546e30064f227bda07', // Seu ProjectID real do WalletConnect
+  };
+
+  const chains = [
+    {
+      id: 5042002,
+      name: 'Arc Testnet',
+      network: 'arc-testnet',
+      nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+      rpcUrls: { default: { http: ['[https://rpc.testnet.arc.network](https://rpc.testnet.arc.network)'] } },
+      blockExplorers: { default: { name: 'ArcScan', url: '[https://testnet.arcscan.app](https://testnet.arcscan.app)' } },
+      testnet: true,
+    },
+  ];
+
+  return (
+    <PrivyProvider
+      appId={appId}
+      config={{
+        loginMethods: ['email', 'wallet', 'google'],
+        appearance: {
+          theme: 'dark',
+          accentColor: '#676FFF',
+          showWalletLoginFirst: true,
+        },
+        embeddedWallets: {
+          createOnLogin: 'all-users',
+        },
+        defaultChainId: 5042002, // Arc Testnet
+        chains: chains, // Adiciona a rede ARC
+        walletConnectOptions: walletConnectOptions, // Adiciona configuração obrigatória
+      }}
+    >
+      {/* HomePage deve chamar usePrivy() internamente */}
+      <HomePage />
+    </PrivyProvider>
+  );
+}
+
+export default App;
