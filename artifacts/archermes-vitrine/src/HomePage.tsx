@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, parseUnits } from 'ethers';
 import { arcTestnet } from './chains';
 import './Home.css';
@@ -30,11 +30,12 @@ interface FormData {
   linkImagem: string;
 }
 
-type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro';
+type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro' | 'sem-carteira';
 
 function HomePage() {
   const { login, logout, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
+  const { connectWallet } = useConnectWallet();
 
   const [modalAberto, setModalAberto] = useState(false);
   const [estado, setEstado] = useState<Estado>('idle');
@@ -66,7 +67,10 @@ function HomePage() {
 
     try {
       const wallet = wallets[0];
-      if (!wallet) throw new Error('Nenhuma carteira conectada. Faça login novamente.');
+      if (!wallet) {
+        setEstado('sem-carteira');
+        return;
+      }
 
       // Garante que a carteira está na Arc Testnet
       await wallet.switchChain(arcTestnet.id);
@@ -153,6 +157,28 @@ function HomePage() {
         <div className="modal-overlay" onClick={fecharModal}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <button className="modal-fechar" onClick={fecharModal} aria-label="Fechar">✕</button>
+
+            {/* SEM CARTEIRA */}
+            {estado === 'sem-carteira' && (
+              <div className="modal-sucesso">
+                <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
+                <h2>Carteira não encontrada</h2>
+                <p>Para publicar na blockchain, você precisa conectar uma carteira.<br />Clique abaixo para conectar.</p>
+                <button
+                  className="btn-publicar"
+                  onClick={() => { connectWallet(); setEstado('idle'); }}
+                >
+                  Conectar Carteira
+                </button>
+                <button
+                  className="btn-sair"
+                  style={{ marginTop: '0.5rem', width: '100%' }}
+                  onClick={() => setEstado('idle')}
+                >
+                  Voltar ao formulário
+                </button>
+              </div>
+            )}
 
             {/* FORMULÁRIO */}
             {(estado === 'idle' || estado === 'erro') && (
