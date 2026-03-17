@@ -107,9 +107,14 @@ function HomePage() {
           <span className="logo-texto">ARCHERMES</span>
         </div>
         {!authenticated ? (
-          <button onClick={login} className="btn-login">
-            Entrar / Criar Minha Loja
-          </button>
+          <div className="acoes-header">
+            <button onClick={login} className="btn-entrar">
+              Entrar
+            </button>
+            <button onClick={login} className="btn-login">
+              Criar Minha Loja
+            </button>
+          </div>
         ) : (
           <div className="painel-usuario">
             <span>Olá, {user?.email ? user.email.address : 'Vendedor'}!</span>
