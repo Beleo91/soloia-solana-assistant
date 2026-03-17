@@ -5,20 +5,92 @@ import { arcTestnet } from './chains';
 import './Home.css';
 
 // ──────────────────────────────────────────────────────────
-// Endereço do contrato na rede ARC test:
-const CONTRACT_ADDRESS = '0x741aA13E978Abf28080Cc04E9dbcf8705aCb7787';
+// Contrato oficial do marketplace na Arc Testnet
+const CONTRACT_ADDRESS = '0x175B6cC316498D4107e83B60E79A1FA7723135D2';
 
-// ABI mínimo — função listItem do contrato
 const CONTRACT_ABI = [
   {
+    inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }],
+    name: 'boostItem',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
     inputs: [
-      { internalType: 'string',  name: 'name',     type: 'string'  },
-      { internalType: 'uint256', name: 'price',    type: 'uint256' },
-      { internalType: 'string',  name: 'imageUrl', type: 'string'  },
+      { internalType: 'uint256', name: '_id', type: 'uint256' },
+      { internalType: 'address payable', name: '_referrer', type: 'address' },
+    ],
+    name: 'buyItem',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }],
+    name: 'confirmDelivery',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'string', name: '_itemName', type: 'string' },
+      { internalType: 'uint256', name: '_price', type: 'uint256' },
     ],
     name: 'listItem',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    stateMutability: 'nonpayable',
+    type: 'constructor',
+  },
+  {
+    inputs: [],
+    name: 'boostFee',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    name: 'items',
+    outputs: [
+      { internalType: 'uint256', name: 'id', type: 'uint256' },
+      { internalType: 'string', name: 'itemName', type: 'string' },
+      { internalType: 'uint256', name: 'price', type: 'uint256' },
+      { internalType: 'address payable', name: 'seller', type: 'address' },
+      { internalType: 'address payable', name: 'buyer', type: 'address' },
+      { internalType: 'address payable', name: 'referrer', type: 'address' },
+      { internalType: 'bool', name: 'isSold', type: 'bool' },
+      { internalType: 'bool', name: 'isDelivered', type: 'bool' },
+      { internalType: 'bool', name: 'isBoosted', type: 'bool' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'name',
+    outputs: [{ internalType: 'string', name: '', type: 'string' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [{ internalType: 'address payable', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'totalItems',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
     type: 'function',
   },
 ];
@@ -27,7 +99,6 @@ const CONTRACT_ABI = [
 interface FormData {
   nomeItem: string;
   preco: string;
-  linkImagem: string;
 }
 
 type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro' | 'sem-carteira';
@@ -41,7 +112,7 @@ function HomePage() {
   const [estado, setEstado] = useState<Estado>('idle');
   const [txHash, setTxHash] = useState('');
   const [erroMsg, setErroMsg] = useState('');
-  const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', linkImagem: '' });
+  const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '' });
 
   function abrirModal() {
     setEstado('idle');
@@ -83,11 +154,11 @@ function HomePage() {
       // Instancia o contrato
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-      // USDC usa 6 casas decimais
-      const precoUsdc = parseUnits(form.preco, 6);
+      // Preço em wei (18 decimais — ETH nativo da Arc Testnet)
+      const precoWei = parseUnits(form.preco, 18);
 
-      // Envia a transação — a carteira pedirá confirmação ao usuário
-      const tx = await contrato.listItem(form.nomeItem, precoUsdc, form.linkImagem);
+      // Chama listItem(_itemName, _price) no contrato oficial
+      const tx = await contrato.listItem(form.nomeItem, precoWei);
       await tx.wait();
 
       setTxHash(tx.hash);
@@ -206,32 +277,15 @@ function HomePage() {
                   </div>
 
                   <div className="campo">
-                    <label htmlFor="preco">Preço (USDC)</label>
+                    <label htmlFor="preco">Preço (ETH)</label>
                     <input
                       id="preco" name="preco" type="number"
-                      placeholder="Ex: 25.00"
-                      step="0.000001" min="0"
+                      placeholder="Ex: 0.05"
+                      step="0.000000000000000001" min="0"
                       value={form.preco} onChange={handleChange}
                       required
                     />
                   </div>
-
-                  <div className="campo">
-                    <label htmlFor="linkImagem">Link da Imagem</label>
-                    <input
-                      id="linkImagem" name="linkImagem" type="text"
-                      placeholder="https://..."
-                      value={form.linkImagem} onChange={handleChange}
-                      required
-                    />
-                  </div>
-
-                  {form.linkImagem && (
-                    <div className="preview-imagem">
-                      <img src={form.linkImagem} alt="Preview"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                  )}
 
                   {estado === 'erro' && (
                     <div className="modal-erro">⚠️ {erroMsg}</div>
