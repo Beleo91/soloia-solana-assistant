@@ -6,7 +6,7 @@ import './Home.css';
 
 // ──────────────────────────────────────────────────────────
 // Contrato oficial do marketplace na Arc Testnet
-const CONTRACT_ADDRESS = '0x175B6cC316498D4107e83B60E79A1FA7723135D2';
+const CONTRACT_ADDRESS = '0x3Fa4EA19fB854B237Cb19F647832725911B15C1a';
 
 const CONTRACT_ABI = [
   {
@@ -34,6 +34,38 @@ const CONTRACT_ABI = [
     type: 'function',
   },
   {
+    inputs: [],
+    stateMutability: 'nonpayable',
+    type: 'constructor',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'buyer', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'referrer', type: 'address' },
+    ],
+    name: 'ItemBought',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [{ indexed: true, internalType: 'uint256', name: 'id', type: 'uint256' }],
+    name: 'ItemDelivered',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: false, internalType: 'string', name: 'itemName', type: 'string' },
+      { indexed: false, internalType: 'uint256', name: 'price', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'seller', type: 'address' },
+    ],
+    name: 'ItemListed',
+    type: 'event',
+  },
+  {
     inputs: [
       { internalType: 'string', name: '_itemName', type: 'string' },
       { internalType: 'uint256', name: '_price', type: 'uint256' },
@@ -44,16 +76,20 @@ const CONTRACT_ABI = [
     type: 'function',
   },
   {
-    inputs: [],
+    inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }],
+    name: 'refundBuyer',
+    outputs: [],
     stateMutability: 'nonpayable',
-    type: 'constructor',
+    type: 'function',
   },
   {
-    inputs: [],
-    name: 'boostFee',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'buyer', type: 'address' },
+    ],
+    name: 'RefundIssued',
+    type: 'event',
   },
   {
     inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
@@ -69,13 +105,6 @@ const CONTRACT_ABI = [
       { internalType: 'bool', name: 'isDelivered', type: 'bool' },
       { internalType: 'bool', name: 'isBoosted', type: 'bool' },
     ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'name',
-    outputs: [{ internalType: 'string', name: '', type: 'string' }],
     stateMutability: 'view',
     type: 'function',
   },
@@ -118,7 +147,7 @@ function HomePage() {
     setEstado('idle');
     setTxHash('');
     setErroMsg('');
-    setForm({ nomeItem: '', preco: '', linkImagem: '' });
+    setForm({ nomeItem: '', preco: '' });
     setModalAberto(true);
   }
 
