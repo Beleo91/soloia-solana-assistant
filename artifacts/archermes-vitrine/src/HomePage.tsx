@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
-import { BrowserProvider, Contract, parseUnits } from 'ethers';
+import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { arcTestnet } from './chains';
 import './Home.css';
 
@@ -125,12 +125,24 @@ const CONTRACT_ABI = [
 ];
 // ──────────────────────────────────────────────────────────
 
+interface ItemBlockchain {
+  id: number;
+  itemName: string;
+  priceEth: string;
+  seller: string;
+  isBoosted: boolean;
+}
+
 interface FormData {
   nomeItem: string;
   preco: string;
 }
 
 type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro' | 'sem-carteira';
+
+function abreviarEndereco(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 function HomePage() {
   const { login, logout, authenticated, user } = usePrivy();
@@ -142,6 +154,44 @@ function HomePage() {
   const [txHash, setTxHash] = useState('');
   const [erroMsg, setErroMsg] = useState('');
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '' });
+
+  // ── Vitrine ──
+  const [vitrine, setVitrine] = useState<ItemBlockchain[]>([]);
+  const [carregandoVitrine, setCarregandoVitrine] = useState(true);
+  const [erroVitrine, setErroVitrine] = useState('');
+
+  const carregarVitrine = useCallback(async () => {
+    setCarregandoVitrine(true);
+    setErroVitrine('');
+    try {
+      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const total: bigint = await contrato.totalItems();
+      const itens: ItemBlockchain[] = [];
+      for (let i = 1; i <= Number(total); i++) {
+        const item = await contrato.items(i);
+        if (!item.isSold) {
+          itens.push({
+            id: Number(item.id),
+            itemName: item.itemName,
+            priceEth: formatUnits(item.price, 18),
+            seller: item.seller,
+            isBoosted: item.isBoosted,
+          });
+        }
+      }
+      setVitrine(itens);
+    } catch (err) {
+      console.error('Erro ao carregar vitrine:', err);
+      setErroVitrine('Não foi possível carregar os produtos. Tente novamente.');
+    } finally {
+      setCarregandoVitrine(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarVitrine();
+  }, [carregarVitrine]);
 
   function abrirModal() {
     setEstado('idle');
@@ -172,26 +222,20 @@ function HomePage() {
         return;
       }
 
-      // Garante que a carteira está na Arc Testnet
       await wallet.switchChain(arcTestnet.id);
 
-      // Obtém o provider EIP-1193 da carteira Privy
       const eip1193 = await wallet.getEthereumProvider();
       const provider = new BrowserProvider(eip1193);
       const signer = await provider.getSigner();
 
-      // Instancia o contrato
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      // Preço em wei (18 decimais — ETH nativo da Arc Testnet)
       const precoWei = parseUnits(form.preco, 18);
-
-      // Chama listItem(_itemName, _price) no contrato oficial
       const tx = await contrato.listItem(form.nomeItem, precoWei);
       await tx.wait();
 
       setTxHash(tx.hash);
       setEstado('sucesso');
+      carregarVitrine();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErroMsg(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);
@@ -201,6 +245,7 @@ function HomePage() {
 
   return (
     <div className="container-principal">
+      {/* ── HEADER ── */}
       <header className="cabecalho">
         <div className="logo-wrapper">
           <img src="/images/logo-ahs.png" alt="ARCHERMES" className="logo-img" />
@@ -208,45 +253,158 @@ function HomePage() {
         </div>
         {!authenticated ? (
           <div className="acoes-header">
-            <button onClick={login} className="btn-entrar">
-              Entrar
-            </button>
-            <button onClick={login} className="btn-login">
-              Criar Minha Loja
-            </button>
+            <button onClick={login} className="btn-entrar">Entrar</button>
+            <button onClick={login} className="btn-login">Criar Minha Loja</button>
           </div>
         ) : (
           <div className="painel-usuario">
             <span>Olá, {user?.email ? user.email.address : 'Vendedor'}!</span>
-            <button onClick={abrirModal} className="btn-anunciar">
-              + Anunciar Produto
-            </button>
-            <button onClick={() => logout()} className="btn-sair">
-              Sair
-            </button>
+            <button onClick={abrirModal} className="btn-anunciar">+ Anunciar Produto</button>
+            <button onClick={() => logout()} className="btn-sair">Sair</button>
           </div>
         )}
       </header>
 
-      <section className="area-patrocinada">
-        <h2>🔥 Lojas em Destaque</h2>
-        <p className="subtitulo">As melhores ofertas da semana</p>
-        <div className="carrossel-anuncios">
-          <div className="card-destaque">
-            <span className="tag-patrocinado">Patrocinado</span>
-            <img src="foto-perfume.jpg" alt="Perfumes Importados" />
-            <h3>Oásis dos Perfumes</h3>
-            <p>Frete grátis para todo o país</p>
+      {/* ── VITRINE DINÂMICA ── */}
+      <section className="px-6 py-10 max-w-7xl mx-auto w-full">
+        {/* Título */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-black tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
+                textShadow: '0 0 20px rgba(0,229,255,0.5)' }}>
+              ⬡ Vitrine On-Chain
+            </h2>
+            <p className="text-white/40 text-sm mt-1 tracking-wide">
+              Produtos registrados na Arc Testnet em tempo real
+            </p>
           </div>
-          <div className="card-destaque">
-            <span className="tag-patrocinado">Patrocinado</span>
-            <img src="foto-tenis.jpg" alt="Tênis Exclusivos" />
-            <h3>Sneakers Store</h3>
-            <p>Modelos exclusivos</p>
-          </div>
+          <button
+            onClick={carregarVitrine}
+            className="text-xs text-cyan-400 border border-cyan-400/30 px-3 py-1.5 rounded-md
+              hover:bg-cyan-400/10 transition-all duration-200 tracking-widest uppercase"
+            style={{ fontFamily: "'Orbitron', sans-serif" }}
+          >
+            ↻ Atualizar
+          </button>
         </div>
+
+        {/* Estados da vitrine */}
+        {carregandoVitrine && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+            <p className="text-cyan-400/60 text-sm tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif" }}>
+              Sincronizando com a blockchain...
+            </p>
+          </div>
+        )}
+
+        {!carregandoVitrine && erroVitrine && (
+          <div className="flex flex-col items-center py-16 gap-3">
+            <span className="text-3xl">⚠️</span>
+            <p className="text-red-400 text-sm">{erroVitrine}</p>
+            <button onClick={carregarVitrine}
+              className="text-xs text-cyan-400 underline mt-1">
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {!carregandoVitrine && !erroVitrine && vitrine.length === 0 && (
+          <div className="flex flex-col items-center py-20 gap-4">
+            <div className="text-5xl opacity-30">⬡</div>
+            <p className="text-white/30 text-sm tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif" }}>
+              Nenhum produto listado ainda
+            </p>
+            {authenticated && (
+              <button onClick={abrirModal}
+                className="mt-2 text-xs text-cyan-400 border border-cyan-400/30 px-4 py-2 rounded-lg
+                  hover:bg-cyan-400/10 transition-all duration-200">
+                + Seja o primeiro a anunciar
+              </button>
+            )}
+          </div>
+        )}
+
+        {!carregandoVitrine && vitrine.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            {vitrine.map((item) => (
+              <div
+                key={item.id}
+                className="group relative rounded-2xl border border-white/10 p-5 flex flex-col gap-4
+                  transition-all duration-300 hover:-translate-y-2
+                  hover:border-cyan-500 hover:shadow-[0_0_25px_rgba(0,255,255,0.25)]"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                }}
+              >
+                {/* Badge boosted */}
+                {item.isBoosted && (
+                  <span className="absolute top-3 right-3 text-[10px] font-bold tracking-widest
+                    bg-purple-500/20 border border-purple-400/40 text-purple-300 px-2 py-0.5 rounded-full"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    ⚡ BOOST
+                  </span>
+                )}
+
+                {/* Ícone placeholder */}
+                <div className="w-full h-32 rounded-xl flex items-center justify-center
+                  bg-gradient-to-br from-cyan-500/10 to-purple-600/10 border border-white/5
+                  group-hover:from-cyan-500/20 group-hover:to-purple-600/20 transition-all duration-300">
+                  <span className="text-4xl opacity-40">⬡</span>
+                </div>
+
+                {/* Info */}
+                <div className="flex flex-col gap-1 flex-1">
+                  <h3 className="font-bold text-white leading-tight line-clamp-2"
+                    style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.05em' }}>
+                    {item.itemName}
+                  </h3>
+                  <p className="text-white/30 text-[11px] tracking-wide font-mono">
+                    {abreviarEndereco(item.seller)}
+                  </p>
+                </div>
+
+                {/* Preço */}
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
+                    <p className="text-lg font-black"
+                      style={{ color: '#00e5ff', fontFamily: "'Orbitron', sans-serif",
+                        textShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
+                      {parseFloat(item.priceEth).toFixed(4)}
+                      <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
+                </div>
+
+                {/* Botão comprar */}
+                <button
+                  className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
+                    transition-all duration-300 relative overflow-hidden
+                    hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] active:scale-95"
+                  style={{
+                    fontFamily: "'Orbitron', sans-serif",
+                    background: 'linear-gradient(135deg, #00e5ff22, #7c3aed44)',
+                    border: '1px solid rgba(0,229,255,0.3)',
+                    color: '#00e5ff',
+                  }}
+                  onClick={() => !authenticated && login()}
+                >
+                  {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
+      {/* ── CATEGORIAS ── */}
       <section className="area-nichos">
         <h2>Explore por Categorias</h2>
         <div className="grid-categorias">
@@ -269,17 +427,11 @@ function HomePage() {
                 <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
                 <h2>Carteira não encontrada</h2>
                 <p>Para publicar na blockchain, você precisa conectar uma carteira.<br />Clique abaixo para conectar.</p>
-                <button
-                  className="btn-publicar"
-                  onClick={() => { connectWallet(); setEstado('idle'); }}
-                >
+                <button className="btn-publicar" onClick={() => { connectWallet(); setEstado('idle'); }}>
                   Conectar Carteira
                 </button>
-                <button
-                  className="btn-sair"
-                  style={{ marginTop: '0.5rem', width: '100%' }}
-                  onClick={() => setEstado('idle')}
-                >
+                <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }}
+                  onClick={() => setEstado('idle')}>
                   Voltar ao formulário
                 </button>
               </div>
