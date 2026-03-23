@@ -1,0 +1,341 @@
+Excelente! A vitrine está linda, mas precisamos fazer o upgrade da arquitetura para a V6 (Sistema de Shopping Center) e corrigir a moeda.
+
+1. Ajuste Visual de Moeda:
+Em todo o site (Vitrine, cards, etc.), onde o ethers.js estiver formatando o preço, mude o texto/símbolo de 'ETH' para 'USDC' (pois a Arc Network usa USDC nativo).
+
+2. Conexão do Novo Contrato V6:
+O meu modelo de negócios mudou. Agora a Archermes é um Shopping Center onde os vendedores pagam para abrir lojas.
+
+O NOVO Endereço do Contrato é: 0x052Eca198d0d505E3b283F64aF44b08a4c44975b
+
+A NOVA ABI do Contrato é: [
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "_id",
+"type": "uint256"
+},
+{
+"internalType": "address payable",
+"name": "_referrer",
+"type": "address"
+}
+],
+"name": "buyItem",
+"outputs": [],
+"stateMutability": "payable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "_id",
+"type": "uint256"
+}
+],
+"name": "confirmDelivery",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "string",
+"name": "_name",
+"type": "string"
+}
+],
+"name": "createStore",
+"outputs": [],
+"stateMutability": "payable",
+"type": "function"
+},
+{
+"inputs": [],
+"stateMutability": "nonpayable",
+"type": "constructor"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "uint256",
+"name": "id",
+"type": "uint256"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "buyer",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "referrer",
+"type": "address"
+}
+],
+"name": "ItemBought",
+"type": "event"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "uint256",
+"name": "id",
+"type": "uint256"
+}
+],
+"name": "ItemDelivered",
+"type": "event"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "uint256",
+"name": "id",
+"type": "uint256"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "itemName",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "price",
+"type": "uint256"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "seller",
+"type": "address"
+}
+],
+"name": "ItemListed",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "string",
+"name": "_itemName",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "_price",
+"type": "uint256"
+}
+],
+"name": "listItem",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "renewStore",
+"outputs": [],
+"stateMutability": "payable",
+"type": "function"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "owner",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "storeName",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "expiresAt",
+"type": "uint256"
+}
+],
+"name": "StoreCreated",
+"type": "event"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "owner",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "newExpiresAt",
+"type": "uint256"
+}
+],
+"name": "StoreRenewed",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "items",
+"outputs": [
+{
+"internalType": "uint256",
+"name": "id",
+"type": "uint256"
+},
+{
+"internalType": "string",
+"name": "itemName",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "price",
+"type": "uint256"
+},
+{
+"internalType": "address payable",
+"name": "seller",
+"type": "address"
+},
+{
+"internalType": "address payable",
+"name": "buyer",
+"type": "address"
+},
+{
+"internalType": "address payable",
+"name": "referrer",
+"type": "address"
+},
+{
+"internalType": "bool",
+"name": "isSold",
+"type": "bool"
+},
+{
+"internalType": "bool",
+"name": "isDelivered",
+"type": "bool"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "owner",
+"outputs": [
+{
+"internalType": "address payable",
+"name": "",
+"type": "address"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "storeCreationFee",
+"outputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "storeMonthlyFee",
+"outputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "",
+"type": "address"
+}
+],
+"name": "stores",
+"outputs": [
+{
+"internalType": "string",
+"name": "storeName",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "expiresAt",
+"type": "uint256"
+},
+{
+"internalType": "bool",
+"name": "isActive",
+"type": "bool"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "totalItems",
+"outputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+}
+]
+
+3. Nova Função no Frontend (Criar Loja):
+Substitua o formulário antigo de 'Anunciar Produto'. Crie uma nova página ou modal chamado 'Minha Loja'.
+
+O usuário deve digitar o Nome da Loja e clicar no botão 'Abrir Loja'.
+
+Esse botão deve chamar a função createStore(string _name) do contrato, enviando 0.01 ether (que será lido como 0.01 USDC) no msg.value (parseUnits('0.01', 18)).
