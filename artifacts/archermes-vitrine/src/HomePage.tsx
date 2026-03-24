@@ -4,8 +4,10 @@ import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } f
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import StoreDashboard from './StoreDashboard';
+import AffiliateDashboard from './AffiliateDashboard';
 import './Home.css';
 
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
 
 interface ItemBlockchain {
@@ -30,10 +32,20 @@ interface FormData {
 }
 
 type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro' | 'sem-carteira';
-type Pagina = 'home' | 'minha-loja';
+type BuyEstado = 'idle' | 'confirmando' | 'sucesso' | 'erro';
+type Pagina = 'home' | 'minha-loja' | 'afiliado';
 
 function abreviarEndereco(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
+
+function lerRefDaUrl(): string {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref') ?? '';
+    if (ref.startsWith('0x') && ref.length === 42) return ref;
+  } catch { /* ignore */ }
+  return ZERO_ADDRESS;
 }
 
 function handleTilt(e: React.MouseEvent<HTMLDivElement>) {
@@ -43,15 +55,8 @@ function handleTilt(e: React.MouseEvent<HTMLDivElement>) {
   const y = (e.clientY - rect.top) / rect.height;
   const rX = (y - 0.5) * -18;
   const rY = (x - 0.5) * 18;
-  const sX = rY * -0.6;
-  const sY = Math.abs(rX) * 0.3;
   el.style.transform = `perspective(700px) rotateX(${rX}deg) rotateY(${rY}deg) translateY(-6px)`;
-  el.style.boxShadow = `${sX}px ${sY}px 28px rgba(0,229,255,0.22), 0 0 20px rgba(0,229,255,0.08)`;
-}
-
-function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
-  e.currentTarget.style.transform = '';
-  e.currentTarget.style.boxShadow = '';
+  el.style.boxShadow = `${rY * -0.6}px ${Math.abs(rX) * 0.3}px 28px rgba(0,229,255,0.22)`;
 }
 
 function handleTiltPro(e: React.MouseEvent<HTMLDivElement>) {
@@ -61,10 +66,13 @@ function handleTiltPro(e: React.MouseEvent<HTMLDivElement>) {
   const y = (e.clientY - rect.top) / rect.height;
   const rX = (y - 0.5) * -18;
   const rY = (x - 0.5) * 18;
-  const sX = rY * -0.6;
-  const sY = Math.abs(rX) * 0.3;
   el.style.transform = `perspective(700px) rotateX(${rX}deg) rotateY(${rY}deg) translateY(-6px)`;
-  el.style.boxShadow = `${sX}px ${sY}px 28px rgba(251,191,36,0.3), 0 0 30px rgba(192,132,252,0.2)`;
+  el.style.boxShadow = `${rY * -0.6}px ${Math.abs(rX) * 0.3}px 28px rgba(251,191,36,0.3)`;
+}
+
+function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
+  e.currentTarget.style.transform = '';
+  e.currentTarget.style.boxShadow = '';
 }
 
 export default function HomePage() {
@@ -79,6 +87,7 @@ export default function HomePage() {
   const [erroMsg, setErroMsg] = useState('');
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
 
+  // Vitrine
   const [vitrine, setVitrine] = useState<ItemBlockchain[]>([]);
   const [lojasVip, setLojasVip] = useState<LojaVip[]>([]);
   const [sellersPro, setSellersPro] = useState<Set<string>>(new Set());
@@ -86,6 +95,13 @@ export default function HomePage() {
   const [erroVitrine, setErroVitrine] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('Todos');
   const carrosselRef = useRef<HTMLDivElement>(null);
+
+  // Afiliado / Compra
+  const [refAddress] = useState<string>(() => lerRefDaUrl());
+  const [itemParaComprar, setItemParaComprar] = useState<ItemBlockchain | null>(null);
+  const [buyEstado, setBuyEstado] = useState<BuyEstado>('idle');
+  const [buyErro, setBuyErro] = useState('');
+  const [buyTx, setBuyTx] = useState('');
 
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
@@ -109,7 +125,6 @@ export default function HomePage() {
       }
       setVitrine(itens);
 
-      // Buscar lojas dos vendedores únicos
       const uniqueSellers = [...new Set(itens.map((i) => i.seller.toLowerCase()))];
       if (uniqueSellers.length > 0) {
         const storeResults = await Promise.all(
@@ -122,12 +137,7 @@ export default function HomePage() {
           const tier = Number(s.tier);
           if (tier === 1 && s.storeName) {
             proSet.add(uniqueSellers[idx].toLowerCase());
-            vipList.push({
-              address: uniqueSellers[idx],
-              storeName: s.storeName,
-              productCount: Number(s.productCount),
-              tier,
-            });
+            vipList.push({ address: uniqueSellers[idx], storeName: s.storeName, productCount: Number(s.productCount), tier });
           }
         });
         setSellersPro(proSet);
@@ -178,10 +188,45 @@ export default function HomePage() {
     }
   }
 
+  // ── COMPRA ──
+  function abrirCompra(item: ItemBlockchain) {
+    if (!authenticated) { login(); return; }
+    setItemParaComprar(item);
+    setBuyEstado('idle');
+    setBuyErro('');
+    setBuyTx('');
+  }
+
+  async function confirmarCompra() {
+    if (!itemParaComprar) return;
+    const wallet = wallets[0];
+    if (!wallet) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
+    setBuyEstado('confirmando');
+    try {
+      await wallet.switchChain(arcTestnet.id);
+      const eip1193 = await wallet.getEthereumProvider();
+      const provider = new BrowserProvider(eip1193);
+      const signer = await provider.getSigner();
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const priceWei = parseUnits(itemParaComprar.priceEth, 18);
+      const referrer = refAddress !== ZERO_ADDRESS ? refAddress : ZERO_ADDRESS;
+      const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: priceWei });
+      await tx.wait();
+      setBuyTx(tx.hash);
+      setBuyEstado('sucesso');
+      carregarVitrine();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBuyErro(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);
+      setBuyEstado('erro');
+    }
+  }
+
   const vitrineVisivel = filtroCategoria === 'Todos'
     ? vitrine : vitrine.filter((i) => i.category === filtroCategoria);
 
-  if (pagina === 'minha-loja') {
+  // ── PÁGINA SECUNDÁRIA ──
+  if (pagina !== 'home') {
     return (
       <div className="container-principal">
         <header className="cabecalho">
@@ -194,7 +239,8 @@ export default function HomePage() {
             {authenticated && <button onClick={() => logout()} className="btn-sair">Sair</button>}
           </div>
         </header>
-        <StoreDashboard onVoltar={() => setPagina('home')} />
+        {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => setPagina('home')} />}
+        {pagina === 'afiliado' && <AffiliateDashboard onVoltar={() => setPagina('home')} />}
       </div>
     );
   }
@@ -209,6 +255,10 @@ export default function HomePage() {
         </div>
         {!authenticated ? (
           <div className="acoes-header">
+            <button onClick={() => setPagina('afiliado')} className="btn-entrar"
+              style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80' }}>
+              🔗 Afiliar
+            </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">Minha Loja</button>
             <button onClick={login} className="btn-entrar">Entrar</button>
             <button onClick={login} className="btn-login">Criar Minha Loja</button>
@@ -218,6 +268,10 @@ export default function HomePage() {
             <span style={{ fontSize: '0.82rem' }}>
               {user?.email ? user.email.address : abreviarEndereco(wallets[0]?.address ?? '0x...')}
             </span>
+            <button onClick={() => setPagina('afiliado')} className="btn-entrar"
+              style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80', fontSize: '0.7rem' }}>
+              🔗 Afiliar
+            </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">⬡ Minha Loja</button>
             <button onClick={abrirModal} className="btn-anunciar">+ Anunciar</button>
             <button onClick={() => logout()} className="btn-sair">Sair</button>
@@ -225,7 +279,18 @@ export default function HomePage() {
         )}
       </header>
 
-      {/* ── LOJAS VIP EM DESTAQUE ── */}
+      {/* Banner de ref ativo */}
+      {refAddress !== ZERO_ADDRESS && (
+        <div className="flex items-center justify-center gap-2 py-2 px-4 text-xs"
+          style={{ background: 'rgba(74,222,128,0.08)', borderBottom: '1px solid rgba(74,222,128,0.15)',
+            color: '#4ade80', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}>
+          <span>🔗</span>
+          <span>Link de afiliado ativo: {abreviarEndereco(refAddress)}</span>
+          <span className="text-white/20">— 1% da comissão vai para o divulgador</span>
+        </div>
+      )}
+
+      {/* ── LOJAS VIP ── */}
       {lojasVip.length > 0 && (
         <section className="px-6 pt-8 pb-2 max-w-7xl mx-auto w-full">
           <div className="flex items-center gap-3 mb-5">
@@ -235,23 +300,18 @@ export default function HomePage() {
                 textShadow: '0 0 16px rgba(251,191,36,0.5)' }}>
               Lojas em Destaque
             </h2>
-            <span className="text-[10px] text-white/30 tracking-widest font-mono ml-1">
-              VIP PRO MEMBERS
-            </span>
+            <span className="text-[10px] text-white/30 tracking-widest font-mono ml-1">VIP PRO MEMBERS</span>
           </div>
-          <div
-            ref={carrosselRef}
-            className="flex gap-4 overflow-x-auto pb-3 scroll-oculto"
-            style={{ scrollBehavior: 'smooth' }}
-          >
+          <div ref={carrosselRef} className="flex gap-4 overflow-x-auto pb-3 scroll-oculto">
             {lojasVip.map((loja) => (
               <div key={loja.address} className="loja-vip-card">
                 <div className="loja-vip-avatar">⬡</div>
                 <div className="flex flex-col items-center gap-1">
                   <span className="loja-vip-nome">{loja.storeName}</span>
                   <span className="text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full"
-                    style={{ background: 'rgba(192,132,252,0.15)', color: '#c084fc',
-                      fontFamily: "'Orbitron', sans-serif", border: '1px solid rgba(192,132,252,0.3)' }}>
+                    style={{ fontFamily: "'Orbitron', sans-serif",
+                      background: 'rgba(192,132,252,0.15)', color: '#c084fc',
+                      border: '1px solid rgba(192,132,252,0.3)' }}>
                     ⚡ VIP PRO
                   </span>
                   <span className="text-[10px] text-white/30 mt-0.5">
@@ -265,7 +325,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ── VITRINE DINÂMICA ── */}
+      {/* ── VITRINE ── */}
       <section className="px-6 py-8 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -286,7 +346,6 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Filtro */}
         {vitrine.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
             {['Todos', ...CATEGORIAS].map((cat) => (
@@ -302,7 +361,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Loading */}
         {carregandoVitrine && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
@@ -317,9 +375,7 @@ export default function HomePage() {
           <div className="flex flex-col items-center py-16 gap-3">
             <span className="text-3xl">⚠️</span>
             <p className="text-red-400 text-sm">{erroVitrine}</p>
-            <button onClick={carregarVitrine} className="text-xs text-cyan-400 underline mt-1">
-              Tentar novamente
-            </button>
+            <button onClick={carregarVitrine} className="text-xs text-cyan-400 underline mt-1">Tentar novamente</button>
           </div>
         )}
 
@@ -347,20 +403,18 @@ export default function HomePage() {
               const cardInner = (
                 <div
                   key={isPro ? undefined : item.id}
-                  className="card-produto group relative rounded-2xl border p-5 flex flex-col gap-4 cursor-default"
+                  className="card-produto group relative rounded-2xl p-5 flex flex-col gap-4"
                   style={{
                     background: isPro
                       ? 'linear-gradient(145deg,rgba(124,58,237,0.12),rgba(10,13,26,0.96))'
                       : 'rgba(255,255,255,0.04)',
                     backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
                     border: isPro ? 'none' : '1px solid rgba(255,255,255,0.1)',
                     borderRadius: '1rem',
                   }}
                   onMouseMove={isPro ? handleTiltPro : handleTilt}
                   onMouseLeave={resetTilt}
                 >
-                  {/* Categoria */}
                   {item.category && (
                     <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest
                       bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-full"
@@ -368,34 +422,23 @@ export default function HomePage() {
                       {item.category}
                     </span>
                   )}
-
-                  {/* Badge PRO */}
                   {isPro && (
-                    <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest
-                      px-2 py-0.5 rounded-full"
+                    <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full"
                       style={{ fontFamily: "'Orbitron', sans-serif",
-                        background: 'rgba(251,191,36,0.15)',
-                        border: '1px solid rgba(251,191,36,0.4)',
-                        color: '#fbbf24',
-                        textShadow: '0 0 8px rgba(251,191,36,0.5)' }}>
+                        background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
+                        color: '#fbbf24', textShadow: '0 0 8px rgba(251,191,36,0.5)' }}>
                       ⚡ VIP
                     </span>
                   )}
-
-                  {/* Imagem placeholder */}
-                  <div className={`w-full h-32 rounded-xl flex items-center justify-center
-                    border border-white/5 transition-all duration-300
-                    ${isPro
-                      ? 'bg-gradient-to-br from-yellow-500/10 to-purple-600/15 group-hover:from-yellow-500/20'
-                      : 'bg-gradient-to-br from-cyan-500/10 to-purple-600/10 group-hover:from-cyan-500/20'}`}>
+                  <div className={`w-full h-32 rounded-xl flex items-center justify-center border border-white/5
+                    transition-all duration-300 ${isPro
+                      ? 'bg-gradient-to-br from-yellow-500/10 to-purple-600/15'
+                      : 'bg-gradient-to-br from-cyan-500/10 to-purple-600/10'}`}>
                     <span className="text-4xl opacity-40">⬡</span>
                   </div>
-
-                  {/* Info */}
                   <div className="flex flex-col gap-1 flex-1">
                     <h3 className="font-bold text-white leading-tight line-clamp-2"
-                      style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem',
-                        letterSpacing: '0.05em',
+                      style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.05em',
                         textShadow: isPro ? '0 0 10px rgba(251,191,36,0.3)' : 'none' }}>
                       {item.itemName}
                     </h3>
@@ -403,55 +446,39 @@ export default function HomePage() {
                       {abreviarEndereco(item.seller)}
                     </p>
                   </div>
-
-                  {/* Preço */}
                   <div className="flex items-end justify-between">
                     <div>
                       <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
                       <p className="text-lg font-black"
-                        style={{
-                          color: isPro ? '#fbbf24' : '#00e5ff',
-                          fontFamily: "'Orbitron', sans-serif",
-                          textShadow: isPro
-                            ? '0 0 12px rgba(251,191,36,0.5)'
-                            : '0 0 12px rgba(0,229,255,0.4)',
-                        }}>
+                        style={{ color: isPro ? '#fbbf24' : '#00e5ff', fontFamily: "'Orbitron', sans-serif",
+                          textShadow: isPro ? '0 0 12px rgba(251,191,36,0.5)' : '0 0 12px rgba(0,229,255,0.4)' }}>
                         {parseFloat(item.priceEth).toFixed(4)}
                         <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
                       </p>
                     </div>
                     <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
                   </div>
-
-                  {/* Botão */}
                   <button
                     className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
-                      transition-all duration-300 active:scale-95"
+                      transition-all duration-300 active:scale-95 hover:brightness-110"
                     style={{
                       fontFamily: "'Orbitron', sans-serif",
                       background: isPro
                         ? 'linear-gradient(135deg,rgba(251,191,36,0.15),rgba(192,132,252,0.2))'
                         : 'linear-gradient(135deg,#00e5ff22,#7c3aed44)',
-                      border: isPro
-                        ? '1px solid rgba(251,191,36,0.35)'
-                        : '1px solid rgba(0,229,255,0.3)',
+                      border: isPro ? '1px solid rgba(251,191,36,0.35)' : '1px solid rgba(0,229,255,0.3)',
                       color: isPro ? '#fbbf24' : '#00e5ff',
                     }}
-                    onClick={() => !authenticated && login()}
+                    onClick={() => abrirCompra(item)}
                   >
                     {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
                   </button>
                 </div>
               );
 
-              if (isPro) {
-                return (
-                  <div key={item.id} className="pro-card-wrapper">
-                    {cardInner}
-                  </div>
-                );
-              }
-              return cardInner;
+              return isPro ? (
+                <div key={item.id} className="pro-card-wrapper">{cardInner}</div>
+              ) : cardInner;
             })}
           </div>
         )}
@@ -469,22 +496,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── MODAL ── */}
+      {/* ── MODAL ANUNCIAR ── */}
       {modalAberto && (
         <div className="modal-overlay" onClick={fecharModal}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-fechar" onClick={fecharModal} aria-label="Fechar">✕</button>
+            <button className="modal-fechar" onClick={fecharModal}>✕</button>
 
             {estado === 'sem-carteira' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
                 <h2>Carteira não encontrada</h2>
                 <p>Conecte uma carteira para publicar na blockchain.</p>
-                <button className="btn-publicar" onClick={() => { connectWallet(); setEstado('idle'); }}>
-                  Conectar Carteira
-                </button>
-                <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }}
-                  onClick={() => setEstado('idle')}>Voltar</button>
+                <button className="btn-publicar" onClick={() => { connectWallet(); setEstado('idle'); }}>Conectar Carteira</button>
+                <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }} onClick={() => setEstado('idle')}>Voltar</button>
               </div>
             )}
 
@@ -497,20 +521,18 @@ export default function HomePage() {
                 </div>
                 <form className="modal-form" onSubmit={handlePublicar}>
                   <div className="campo">
-                    <label htmlFor="nomeItem">Nome do Item</label>
-                    <input id="nomeItem" name="nomeItem" type="text"
-                      placeholder="Ex: Tênis Air Max Limited"
+                    <label>Nome do Item</label>
+                    <input name="nomeItem" type="text" placeholder="Ex: Tênis Air Max Limited"
                       value={form.nomeItem} onChange={handleChange} required autoComplete="off" />
                   </div>
                   <div className="campo">
-                    <label htmlFor="preco">Preço (ETH)</label>
-                    <input id="preco" name="preco" type="number" placeholder="Ex: 0.05"
-                      step="0.000000000000000001" min="0"
-                      value={form.preco} onChange={handleChange} required />
+                    <label>Preço (ETH)</label>
+                    <input name="preco" type="number" placeholder="Ex: 0.05"
+                      step="0.000000000000000001" min="0" value={form.preco} onChange={handleChange} required />
                   </div>
                   <div className="campo">
-                    <label htmlFor="categoria">Categoria</label>
-                    <select id="categoria" name="categoria" value={form.categoria} onChange={handleChange}
+                    <label>Categoria</label>
+                    <select name="categoria" value={form.categoria} onChange={handleChange}
                       style={{ background: 'rgba(255,255,255,0.05)', color: '#fff',
                         border: '1px solid rgba(0,229,255,0.18)', borderRadius: '8px',
                         padding: '0.65rem 1rem', width: '100%', fontSize: '0.9rem', outline: 'none' }}>
@@ -527,7 +549,7 @@ export default function HomePage() {
               <div className="modal-sucesso">
                 <div className="sucesso-icone spinner">⟳</div>
                 <h2>Aguardando confirmação...</h2>
-                <p>A carteira vai pedir sua autorização.<br />Confirme a transação para continuar.</p>
+                <p>Confirme a transação na sua carteira.</p>
               </div>
             )}
 
@@ -536,12 +558,107 @@ export default function HomePage() {
                 <div className="sucesso-icone">✓</div>
                 <h2>Produto postado na Blockchain!</h2>
                 <p><strong>{form.nomeItem}</strong> foi listado com sucesso.</p>
-                {txHash && (
-                  <p className="contrato-info">
-                    TX: <code title={txHash}>{txHash.slice(0, 12)}…{txHash.slice(-6)}</code>
-                  </p>
-                )}
+                {txHash && <p className="contrato-info">TX: <code>{txHash.slice(0,12)}…{txHash.slice(-6)}</code></p>}
                 <button onClick={fecharModal} className="btn-publicar">Fechar</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL COMPRA ── */}
+      {itemParaComprar && (
+        <div className="modal-overlay" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-fechar" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>✕</button>
+
+            {buyEstado === 'idle' && (
+              <>
+                <div className="modal-topo">
+                  <span className="modal-icone">⚡</span>
+                  <h2>Confirmar Compra</h2>
+                  <p>Revise os detalhes antes de confirmar na blockchain</p>
+                </div>
+                <div className="flex flex-col gap-4 mt-2">
+                  <div className="rounded-xl border border-white/10 p-4 flex flex-col gap-2"
+                    style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <p className="text-xs text-white/40 tracking-widest uppercase"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>Produto</p>
+                    <p className="font-bold text-white text-sm"
+                      style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}>
+                      {itemParaComprar.itemName}
+                    </p>
+                    <p className="text-white/30 text-xs font-mono">Vendedor: {abreviarEndereco(itemParaComprar.seller)}</p>
+                    {itemParaComprar.category && (
+                      <p className="text-white/30 text-xs">Categoria: {itemParaComprar.category}</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-cyan-400/20 p-4 flex items-center justify-between"
+                    style={{ background: 'rgba(0,229,255,0.04)' }}>
+                    <span className="text-xs text-white/50 tracking-widest uppercase"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>Total</span>
+                    <span className="text-2xl font-black"
+                      style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
+                        textShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
+                      {parseFloat(itemParaComprar.priceEth).toFixed(4)}
+                      <span className="text-sm text-white/40 ml-1 font-normal">ETH</span>
+                    </span>
+                  </div>
+
+                  {refAddress !== ZERO_ADDRESS && (
+                    <div className="rounded-xl border border-green-400/20 p-3 flex items-center gap-2"
+                      style={{ background: 'rgba(74,222,128,0.05)' }}>
+                      <span className="text-green-400 text-sm">🔗</span>
+                      <div>
+                        <p className="text-green-400 text-[11px] font-bold tracking-widest"
+                          style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          Link de afiliado ativo
+                        </p>
+                        <p className="text-white/30 text-[10px] font-mono">{abreviarEndereco(refAddress)}</p>
+                      </div>
+                      <span className="ml-auto text-green-400/60 text-[10px]">+1% comissão</span>
+                    </div>
+                  )}
+
+                  <button onClick={confirmarCompra} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
+                    ⚡ Confirmar Compra
+                  </button>
+                </div>
+              </>
+            )}
+
+            {buyEstado === 'confirmando' && (
+              <div className="modal-sucesso">
+                <div className="sucesso-icone spinner">⟳</div>
+                <h2>Processando na blockchain...</h2>
+                <p>Confirme a transação na sua carteira e aguarde.</p>
+              </div>
+            )}
+
+            {buyEstado === 'sucesso' && (
+              <div className="modal-sucesso">
+                <div className="sucesso-icone" style={{ borderColor: '#4ade80', color: '#4ade80',
+                  boxShadow: '0 0 24px rgba(74,222,128,0.35)' }}>✓</div>
+                <h2 style={{ color: '#4ade80' }}>Compra Realizada!</h2>
+                <p><strong>{itemParaComprar?.itemName}</strong> é seu!</p>
+                {buyTx && <p className="contrato-info">TX: <code>{buyTx.slice(0,12)}…{buyTx.slice(-6)}</code></p>}
+                <button onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }} className="btn-publicar">
+                  Fechar
+                </button>
+              </div>
+            )}
+
+            {buyEstado === 'erro' && (
+              <div className="modal-sucesso">
+                <div className="sucesso-icone" style={{ borderColor: '#f87171', color: '#f87171' }}>✕</div>
+                <h2>Erro na transação</h2>
+                <div className="modal-erro" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
+                  {buyErro}
+                </div>
+                <button onClick={() => setBuyEstado('idle')} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
+                  Tentar Novamente
+                </button>
               </div>
             )}
           </div>
