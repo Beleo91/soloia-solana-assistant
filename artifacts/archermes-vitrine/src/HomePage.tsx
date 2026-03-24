@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { arcTestnet } from './chains';
@@ -16,6 +16,13 @@ interface ItemBlockchain {
   seller: string;
 }
 
+interface LojaVip {
+  address: string;
+  storeName: string;
+  productCount: number;
+  tier: number;
+}
+
 interface FormData {
   nomeItem: string;
   preco: string;
@@ -29,7 +36,38 @@ function abreviarEndereco(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-function HomePage() {
+function handleTilt(e: React.MouseEvent<HTMLDivElement>) {
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  const rX = (y - 0.5) * -18;
+  const rY = (x - 0.5) * 18;
+  const sX = rY * -0.6;
+  const sY = Math.abs(rX) * 0.3;
+  el.style.transform = `perspective(700px) rotateX(${rX}deg) rotateY(${rY}deg) translateY(-6px)`;
+  el.style.boxShadow = `${sX}px ${sY}px 28px rgba(0,229,255,0.22), 0 0 20px rgba(0,229,255,0.08)`;
+}
+
+function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
+  e.currentTarget.style.transform = '';
+  e.currentTarget.style.boxShadow = '';
+}
+
+function handleTiltPro(e: React.MouseEvent<HTMLDivElement>) {
+  const el = e.currentTarget;
+  const rect = el.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  const rX = (y - 0.5) * -18;
+  const rY = (x - 0.5) * 18;
+  const sX = rY * -0.6;
+  const sY = Math.abs(rX) * 0.3;
+  el.style.transform = `perspective(700px) rotateX(${rX}deg) rotateY(${rY}deg) translateY(-6px)`;
+  el.style.boxShadow = `${sX}px ${sY}px 28px rgba(251,191,36,0.3), 0 0 30px rgba(192,132,252,0.2)`;
+}
+
+export default function HomePage() {
   const { login, logout, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const { connectWallet } = useConnectWallet();
@@ -42,9 +80,12 @@ function HomePage() {
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
 
   const [vitrine, setVitrine] = useState<ItemBlockchain[]>([]);
+  const [lojasVip, setLojasVip] = useState<LojaVip[]>([]);
+  const [sellersPro, setSellersPro] = useState<Set<string>>(new Set());
   const [carregandoVitrine, setCarregandoVitrine] = useState(true);
   const [erroVitrine, setErroVitrine] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('Todos');
+  const carrosselRef = useRef<HTMLDivElement>(null);
 
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
@@ -67,6 +108,31 @@ function HomePage() {
         }
       }
       setVitrine(itens);
+
+      // Buscar lojas dos vendedores únicos
+      const uniqueSellers = [...new Set(itens.map((i) => i.seller.toLowerCase()))];
+      if (uniqueSellers.length > 0) {
+        const storeResults = await Promise.all(
+          uniqueSellers.map((addr) => contrato.stores(addr).catch(() => null))
+        );
+        const proSet = new Set<string>();
+        const vipList: LojaVip[] = [];
+        storeResults.forEach((s, idx) => {
+          if (!s) return;
+          const tier = Number(s.tier);
+          if (tier === 1 && s.storeName) {
+            proSet.add(uniqueSellers[idx].toLowerCase());
+            vipList.push({
+              address: uniqueSellers[idx],
+              storeName: s.storeName,
+              productCount: Number(s.productCount),
+              tier,
+            });
+          }
+        });
+        setSellersPro(proSet);
+        setLojasVip(vipList);
+      }
     } catch (err) {
       console.error('Erro ao carregar vitrine:', err);
       setErroVitrine('Não foi possível carregar os produtos.');
@@ -78,13 +144,10 @@ function HomePage() {
   useEffect(() => { carregarVitrine(); }, [carregarVitrine]);
 
   function abrirModal() {
-    setEstado('idle');
-    setTxHash('');
-    setErroMsg('');
+    setEstado('idle'); setTxHash(''); setErroMsg('');
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
     setModalAberto(true);
   }
-
   function fecharModal() { setModalAberto(false); setEstado('idle'); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
@@ -93,8 +156,7 @@ function HomePage() {
 
   async function handlePublicar(e: React.FormEvent) {
     e.preventDefault();
-    setEstado('enviando');
-    setErroMsg('');
+    setEstado('enviando'); setErroMsg('');
     try {
       const wallet = wallets[0];
       if (!wallet) { setEstado('sem-carteira'); return; }
@@ -117,8 +179,7 @@ function HomePage() {
   }
 
   const vitrineVisivel = filtroCategoria === 'Todos'
-    ? vitrine
-    : vitrine.filter((i) => i.category === filtroCategoria);
+    ? vitrine : vitrine.filter((i) => i.category === filtroCategoria);
 
   if (pagina === 'minha-loja') {
     return (
@@ -130,9 +191,7 @@ function HomePage() {
           </div>
           <div className="acoes-header">
             <button onClick={() => setPagina('home')} className="btn-entrar">← Início</button>
-            {authenticated && (
-              <button onClick={() => logout()} className="btn-sair">Sair</button>
-            )}
+            {authenticated && <button onClick={() => logout()} className="btn-sair">Sair</button>}
           </div>
         </header>
         <StoreDashboard onVoltar={() => setPagina('home')} />
@@ -156,7 +215,9 @@ function HomePage() {
           </div>
         ) : (
           <div className="painel-usuario">
-            <span>Olá, {user?.email ? user.email.address : 'Vendedor'}!</span>
+            <span style={{ fontSize: '0.82rem' }}>
+              {user?.email ? user.email.address : abreviarEndereco(wallets[0]?.address ?? '0x...')}
+            </span>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">⬡ Minha Loja</button>
             <button onClick={abrirModal} className="btn-anunciar">+ Anunciar</button>
             <button onClick={() => logout()} className="btn-sair">Sair</button>
@@ -164,8 +225,48 @@ function HomePage() {
         )}
       </header>
 
+      {/* ── LOJAS VIP EM DESTAQUE ── */}
+      {lojasVip.length > 0 && (
+        <section className="px-6 pt-8 pb-2 max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-3 mb-5">
+            <span className="text-lg" style={{ filter: 'drop-shadow(0 0 8px #fbbf24)' }}>⚡</span>
+            <h2 className="text-base font-black tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24',
+                textShadow: '0 0 16px rgba(251,191,36,0.5)' }}>
+              Lojas em Destaque
+            </h2>
+            <span className="text-[10px] text-white/30 tracking-widest font-mono ml-1">
+              VIP PRO MEMBERS
+            </span>
+          </div>
+          <div
+            ref={carrosselRef}
+            className="flex gap-4 overflow-x-auto pb-3 scroll-oculto"
+            style={{ scrollBehavior: 'smooth' }}
+          >
+            {lojasVip.map((loja) => (
+              <div key={loja.address} className="loja-vip-card">
+                <div className="loja-vip-avatar">⬡</div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="loja-vip-nome">{loja.storeName}</span>
+                  <span className="text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(192,132,252,0.15)', color: '#c084fc',
+                      fontFamily: "'Orbitron', sans-serif", border: '1px solid rgba(192,132,252,0.3)' }}>
+                    ⚡ VIP PRO
+                  </span>
+                  <span className="text-[10px] text-white/30 mt-0.5">
+                    {loja.productCount} produto{loja.productCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
+        </section>
+      )}
+
       {/* ── VITRINE DINÂMICA ── */}
-      <section className="px-6 py-10 max-w-7xl mx-auto w-full">
+      <section className="px-6 py-8 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-black tracking-widest uppercase"
@@ -185,14 +286,14 @@ function HomePage() {
           </button>
         </div>
 
-        {/* Filtro por categoria */}
+        {/* Filtro */}
         {vitrine.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
             {['Todos', ...CATEGORIAS].map((cat) => (
               <button key={cat} onClick={() => setFiltroCategoria(cat)}
                 className={`text-[11px] px-3 py-1.5 rounded-full border transition-all duration-200
                   tracking-widest uppercase ${filtroCategoria === cat
-                    ? 'border-cyan-400 text-cyan-400 bg-cyan-400/10'
+                    ? 'border-cyan-400 text-cyan-400 bg-cyan-400/10 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
                     : 'border-white/10 text-white/30 hover:border-white/20 hover:text-white/50'}`}
                 style={{ fontFamily: "'Orbitron', sans-serif" }}>
                 {cat}
@@ -201,6 +302,7 @@ function HomePage() {
           </div>
         )}
 
+        {/* Loading */}
         {carregandoVitrine && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
@@ -240,62 +342,117 @@ function HomePage() {
 
         {!carregandoVitrine && vitrineVisivel.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {vitrineVisivel.map((item) => (
-              <div key={item.id}
-                className="group relative rounded-2xl border border-white/10 p-5 flex flex-col gap-4
-                  transition-all duration-300 hover:-translate-y-2
-                  hover:border-cyan-500 hover:shadow-[0_0_25px_rgba(0,255,255,0.25)]"
-                style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)' }}>
+            {vitrineVisivel.map((item) => {
+              const isPro = sellersPro.has(item.seller.toLowerCase());
+              const cardInner = (
+                <div
+                  key={isPro ? undefined : item.id}
+                  className="card-produto group relative rounded-2xl border p-5 flex flex-col gap-4 cursor-default"
+                  style={{
+                    background: isPro
+                      ? 'linear-gradient(145deg,rgba(124,58,237,0.12),rgba(10,13,26,0.96))'
+                      : 'rgba(255,255,255,0.04)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: isPro ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '1rem',
+                  }}
+                  onMouseMove={isPro ? handleTiltPro : handleTilt}
+                  onMouseLeave={resetTilt}
+                >
+                  {/* Categoria */}
+                  {item.category && (
+                    <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest
+                      bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-full"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      {item.category}
+                    </span>
+                  )}
 
-                {item.category && (
-                  <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest
-                    bg-white/5 border border-white/10 text-white/40 px-2 py-0.5 rounded-full"
-                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    {item.category}
-                  </span>
-                )}
+                  {/* Badge PRO */}
+                  {isPro && (
+                    <span className="absolute top-3 right-3 text-[9px] font-bold tracking-widest
+                      px-2 py-0.5 rounded-full"
+                      style={{ fontFamily: "'Orbitron', sans-serif",
+                        background: 'rgba(251,191,36,0.15)',
+                        border: '1px solid rgba(251,191,36,0.4)',
+                        color: '#fbbf24',
+                        textShadow: '0 0 8px rgba(251,191,36,0.5)' }}>
+                      ⚡ VIP
+                    </span>
+                  )}
 
-                <div className="w-full h-32 rounded-xl flex items-center justify-center
-                  bg-gradient-to-br from-cyan-500/10 to-purple-600/10 border border-white/5
-                  group-hover:from-cyan-500/20 group-hover:to-purple-600/20 transition-all duration-300">
-                  <span className="text-4xl opacity-40">⬡</span>
-                </div>
+                  {/* Imagem placeholder */}
+                  <div className={`w-full h-32 rounded-xl flex items-center justify-center
+                    border border-white/5 transition-all duration-300
+                    ${isPro
+                      ? 'bg-gradient-to-br from-yellow-500/10 to-purple-600/15 group-hover:from-yellow-500/20'
+                      : 'bg-gradient-to-br from-cyan-500/10 to-purple-600/10 group-hover:from-cyan-500/20'}`}>
+                    <span className="text-4xl opacity-40">⬡</span>
+                  </div>
 
-                <div className="flex flex-col gap-1 flex-1">
-                  <h3 className="font-bold text-white leading-tight line-clamp-2"
-                    style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.05em' }}>
-                    {item.itemName}
-                  </h3>
-                  <p className="text-white/30 text-[11px] tracking-wide font-mono">
-                    {abreviarEndereco(item.seller)}
-                  </p>
-                </div>
-
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
-                    <p className="text-lg font-black"
-                      style={{ color: '#00e5ff', fontFamily: "'Orbitron', sans-serif",
-                        textShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
-                      {parseFloat(item.priceEth).toFixed(4)}
-                      <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
+                  {/* Info */}
+                  <div className="flex flex-col gap-1 flex-1">
+                    <h3 className="font-bold text-white leading-tight line-clamp-2"
+                      style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem',
+                        letterSpacing: '0.05em',
+                        textShadow: isPro ? '0 0 10px rgba(251,191,36,0.3)' : 'none' }}>
+                      {item.itemName}
+                    </h3>
+                    <p className="text-white/30 text-[11px] tracking-wide font-mono">
+                      {abreviarEndereco(item.seller)}
                     </p>
                   </div>
-                  <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
-                </div>
 
-                <button
-                  className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
-                    transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] active:scale-95"
-                  style={{ fontFamily: "'Orbitron', sans-serif",
-                    background: 'linear-gradient(135deg, #00e5ff22, #7c3aed44)',
-                    border: '1px solid rgba(0,229,255,0.3)', color: '#00e5ff' }}
-                  onClick={() => !authenticated && login()}>
-                  {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
-                </button>
-              </div>
-            ))}
+                  {/* Preço */}
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
+                      <p className="text-lg font-black"
+                        style={{
+                          color: isPro ? '#fbbf24' : '#00e5ff',
+                          fontFamily: "'Orbitron', sans-serif",
+                          textShadow: isPro
+                            ? '0 0 12px rgba(251,191,36,0.5)'
+                            : '0 0 12px rgba(0,229,255,0.4)',
+                        }}>
+                        {parseFloat(item.priceEth).toFixed(4)}
+                        <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
+                  </div>
+
+                  {/* Botão */}
+                  <button
+                    className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
+                      transition-all duration-300 active:scale-95"
+                    style={{
+                      fontFamily: "'Orbitron', sans-serif",
+                      background: isPro
+                        ? 'linear-gradient(135deg,rgba(251,191,36,0.15),rgba(192,132,252,0.2))'
+                        : 'linear-gradient(135deg,#00e5ff22,#7c3aed44)',
+                      border: isPro
+                        ? '1px solid rgba(251,191,36,0.35)'
+                        : '1px solid rgba(0,229,255,0.3)',
+                      color: isPro ? '#fbbf24' : '#00e5ff',
+                    }}
+                    onClick={() => !authenticated && login()}
+                  >
+                    {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
+                  </button>
+                </div>
+              );
+
+              if (isPro) {
+                return (
+                  <div key={item.id} className="pro-card-wrapper">
+                    {cardInner}
+                  </div>
+                );
+              }
+              return cardInner;
+            })}
           </div>
         )}
       </section>
@@ -304,8 +461,8 @@ function HomePage() {
       <section className="area-nichos">
         <h2>Explore por Categorias</h2>
         <div className="grid-categorias">
-          {[['👕','Moda e Vestuário'],['📱','Eletrônicos'],['💧','Perfumes e Beleza'],['🎮','Games e Consoles']].map(([icone, nome]) => (
-            <button key={nome} className="btn-nicho" onClick={() => setFiltroCategoria(nome.split(' ')[0])}>
+          {[['👕','Moda'],['📱','Eletrônicos'],['💧','Perfumes e Beleza'],['🎮','Games']].map(([icone, nome]) => (
+            <button key={nome} className="btn-nicho" onClick={() => setFiltroCategoria(nome)}>
               <span className="icone">{icone}</span> {nome}
             </button>
           ))}
@@ -322,7 +479,7 @@ function HomePage() {
               <div className="modal-sucesso">
                 <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
                 <h2>Carteira não encontrada</h2>
-                <p>Para publicar na blockchain, conecte uma carteira.</p>
+                <p>Conecte uma carteira para publicar na blockchain.</p>
                 <button className="btn-publicar" onClick={() => { connectWallet(); setEstado('idle'); }}>
                   Conectar Carteira
                 </button>
@@ -355,9 +512,9 @@ function HomePage() {
                     <label htmlFor="categoria">Categoria</label>
                     <select id="categoria" name="categoria" value={form.categoria} onChange={handleChange}
                       style={{ background: 'rgba(255,255,255,0.05)', color: '#fff',
-                        border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px',
-                        padding: '0.65rem 1rem', width: '100%', fontSize: '0.9rem' }}>
-                      {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        border: '1px solid rgba(0,229,255,0.18)', borderRadius: '8px',
+                        padding: '0.65rem 1rem', width: '100%', fontSize: '0.9rem', outline: 'none' }}>
+                      {CATEGORIAS.map((c) => <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>)}
                     </select>
                   </div>
                   {estado === 'erro' && <div className="modal-erro">⚠️ {erroMsg}</div>}
@@ -378,7 +535,7 @@ function HomePage() {
               <div className="modal-sucesso">
                 <div className="sucesso-icone">✓</div>
                 <h2>Produto postado na Blockchain!</h2>
-                <p><strong>{form.nomeItem}</strong> foi listado com sucesso no marketplace.</p>
+                <p><strong>{form.nomeItem}</strong> foi listado com sucesso.</p>
                 {txHash && (
                   <p className="contrato-info">
                     TX: <code title={txHash}>{txHash.slice(0, 12)}…{txHash.slice(-6)}</code>
@@ -393,5 +550,3 @@ function HomePage() {
     </div>
   );
 }
-
-export default HomePage;
