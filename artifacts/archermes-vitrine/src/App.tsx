@@ -2,10 +2,6 @@ import { PrivyProvider } from '@privy-io/react-auth';
 import { arcTestnet } from './chains';
 import HomePage from './HomePage';
 
-const walletConnectOptions = {
-  projectId: 'e010a30b621481546e30064f227bda07',
-};
-
 function App() {
   return (
     <PrivyProvider
@@ -22,9 +18,8 @@ function App() {
         defaultChain: arcTestnet,
         supportedChains: [arcTestnet],
         embeddedWallets: {
-          createOnLogin: 'all-users',
+          ethereum: { createOnLogin: 'all-users' },
         },
-        walletConnectOptions,
       }}
     >
       <HomePage />

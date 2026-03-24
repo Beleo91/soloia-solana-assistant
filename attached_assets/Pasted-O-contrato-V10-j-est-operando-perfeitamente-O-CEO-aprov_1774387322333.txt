@@ -1,0 +1,39 @@
+O contrato V10 já está operando perfeitamente. O CEO aprovou o pacote final de UX/UI para transformar a ARCHERMES em um marketplace de alto nível. Por favor, implemente todas as funcionalidades abaixo no Frontend (React/Tailwind), mantendo o design Cyberpunk (glassmorphism, bordas neon e fundos escuros):
+
+1. Motor de Busca e Filtros Dinâmicos (HomePage):
+
+Adicione uma Barra de Pesquisa estilizada no topo (ícone de lupa neon). Ela deve filtrar a lista de produtos exibidos buscando pelo itemName.
+
+Adicione Abas de Categorias dinâmicas (ex: Todas, Moda, Eletrônicos, Games). Ao clicar, filtre os cards comparando com a variável category vinda do Smart Contract.
+
+2. Wishlist (Lista de Favoritos Web2):
+
+Adicione um ícone de 'Coração' no canto superior direito de cada card de produto.
+
+Ao clicar, o coração deve preencher com um brilho (glow) vermelho neon.
+
+Salve os IDs dos produtos favoritados no localStorage sob a chave archermes_favorites.
+
+Crie um botão no menu superior chamado 'Meus Favoritos' que filtre e mostre apenas os itens salvos.
+
+3. Chat Interno Pós-Venda (Sistema Anti-Golpe):
+
+Para evitar pagamentos por fora, não usaremos WhatsApp. Crie um sistema de mensagens In-App (MVP usando localStorage) vinculado ao ID do Produto vendido (items[id]).
+
+O botão '💬 Abrir Chat do Pedido' só deve ficar visível DEPOIS da compra (isSold == true) na área 'Meus Pedidos' do Comprador e na aba 'Vendas' do Lojista.
+
+Design do Chat: Fundo escuro com backdrop-blur. Mensagens do usuário atual alinhadas à direita (balão Ciano/Roxo). Mensagens do outro lado alinhadas à esquerda (cinza translúcido). Input neon no rodapé.
+
+Segurança: Fixe um banner no topo do chat com letras vermelhas: '⚠️ SEGURANÇA: Nunca faça pagamentos fora da plataforma. A ARCHERMES não se responsabiliza por acordos externos.'
+
+4. Perguntas e Respostas Públicas (Pré-Venda):
+
+No modal/página de detalhes de cada produto, adicione uma seção pública de 'Perguntas e Respostas'.
+
+Qualquer usuário logado pode enviar uma pergunta.
+
+Apenas o vendedor (seller do item) verá um botão 'Responder' em cada pergunta.
+
+Salve essas Q&As no localStorage atreladas ao ID do produto para este MVP.
+
+Implemente essas 4 funcionalidades agora, garantindo que a navegação continue fluida e responsiva.

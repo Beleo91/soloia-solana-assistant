@@ -430,11 +430,8 @@ export default function HomePage() {
                       ⚡ VIP
                     </span>
                   )}
-                  <div className={`w-full h-32 rounded-xl flex items-center justify-center border border-white/5
-                    transition-all duration-300 ${isPro
-                      ? 'bg-gradient-to-br from-yellow-500/10 to-purple-600/15'
-                      : 'bg-gradient-to-br from-cyan-500/10 to-purple-600/10'}`}>
-                    <span className="text-4xl opacity-40">⬡</span>
+                  <div className={`card-placeholder ${isPro ? 'card-placeholder-pro' : ''}`}>
+                    <span className="card-placeholder-icon" style={isPro ? { filter: 'drop-shadow(0 0 8px rgba(251,191,36,0.5))' } : {}}>⬡</span>
                   </div>
                   <div className="flex flex-col gap-1 flex-1">
                     <h3 className="font-bold text-white leading-tight line-clamp-2"
@@ -459,16 +456,7 @@ export default function HomePage() {
                     <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
                   </div>
                   <button
-                    className="w-full py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
-                      transition-all duration-300 active:scale-95 hover:brightness-110"
-                    style={{
-                      fontFamily: "'Orbitron', sans-serif",
-                      background: isPro
-                        ? 'linear-gradient(135deg,rgba(251,191,36,0.15),rgba(192,132,252,0.2))'
-                        : 'linear-gradient(135deg,#00e5ff22,#7c3aed44)',
-                      border: isPro ? '1px solid rgba(251,191,36,0.35)' : '1px solid rgba(0,229,255,0.3)',
-                      color: isPro ? '#fbbf24' : '#00e5ff',
-                    }}
+                    className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
                     onClick={() => abrirCompra(item)}
                   >
                     {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}

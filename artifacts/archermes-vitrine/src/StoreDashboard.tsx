@@ -257,11 +257,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
             Faça login para acessar sua loja
           </p>
-          <button onClick={login}
-            className="mt-2 px-6 py-2 rounded-lg text-sm font-bold tracking-widest uppercase
-              transition-all hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] hover:-translate-y-0.5"
-            style={{ background: 'linear-gradient(135deg,#00e5ff,#7c3aed)',
-              fontFamily: "'Orbitron', sans-serif", color: '#fff', border: 'none' }}>
+          <button onClick={login} className="btn-neon btn-neon-filled btn-neon-lg">
             Entrar
           </button>
         </div>
@@ -288,9 +284,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           </h2>
           <p className="text-white/60 text-sm">Sua loja está ativa na Arc Testnet.</p>
           <button onClick={() => { setEstado('idle'); setCarregando(true); }}
-            className="mt-2 px-6 py-2 rounded-lg text-xs font-bold tracking-widest uppercase
-              border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/10 transition-all"
-            style={{ fontFamily: "'Orbitron', sans-serif" }}>
+            className="btn-neon btn-neon-cyan">
             Ver Minha Loja
           </button>
         </div>
@@ -342,11 +336,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
               </ul>
               <button disabled={estado === 'criando'}
                 onClick={(e) => { e.stopPropagation(); setPlanoPro(false); handleCriarLoja(false); }}
-                className="w-full py-3 rounded-xl text-xs font-bold tracking-widest uppercase
-                  transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ fontFamily: "'Orbitron', sans-serif",
-                  background: 'linear-gradient(135deg,#00e5ff22,#00e5ff44)',
-                  border: '1px solid rgba(0,229,255,0.4)', color: '#00e5ff' }}>
+                className="btn-neon btn-neon-cyan btn-neon-full btn-neon-lg">
                 {estado === 'criando' && !planoPro ? '⟳ Processando...' : `Abrir por ${basicFee} ETH`}
               </button>
             </div>
@@ -376,11 +366,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
               </ul>
               <button disabled={estado === 'criando'}
                 onClick={(e) => { e.stopPropagation(); setPlanoPro(true); handleCriarLoja(true); }}
-                className="w-full py-3 rounded-xl text-xs font-bold tracking-widest uppercase
-                  transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ fontFamily: "'Orbitron', sans-serif",
-                  background: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
-                  color: '#fff', border: 'none' }}>
+                className="btn-neon btn-neon-purple btn-neon-full btn-neon-lg">
                 {estado === 'criando' && planoPro ? '⟳ Processando...' : `PRO por ${proFee} ETH`}
               </button>
             </div>
@@ -477,19 +463,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div className="flex flex-col gap-3">
                   {loja!.tier === 0 && (
                     <button onClick={handleUpgradePro}
-                      className="w-full py-4 rounded-xl text-xs font-bold tracking-widest uppercase
-                        transition-all hover:shadow-[0_0_25px_rgba(251,191,36,0.35)] hover:-translate-y-0.5 relative overflow-hidden"
-                      style={{ fontFamily: "'Orbitron', sans-serif",
-                        background: 'linear-gradient(135deg,#fbbf24,#7c3aed,#fbbf24)',
-                        backgroundSize: '200%', color: '#fff', border: 'none',
-                        animation: 'shimmerBorder 3s linear infinite' }}>
+                      className="btn-neon btn-neon-filled-gold btn-neon-full btn-neon-lg">
                       ⚡ FAZER UPGRADE PARA PRO — {proFee} ETH
                     </button>
                   )}
-                  <button onClick={handleRenovar}
-                    className="w-full py-3 rounded-xl text-xs font-bold tracking-widest uppercase
-                      transition-all border text-cyan-400 hover:bg-cyan-400/10"
-                    style={{ fontFamily: "'Orbitron', sans-serif", borderColor: 'rgba(0,229,255,0.3)' }}>
+                  <button onClick={handleRenovar} className="btn-neon btn-neon-cyan btn-neon-full">
                     ↻ Renovar Assinatura
                   </button>
                 </div>
@@ -564,17 +542,12 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                       <button
                         onClick={() => handleCancelarItem(prod.id)}
                         disabled={txStatus[prod.id] === 'cancelando'}
-                        className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-lg
-                          border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-all
-                          disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        className="btn-neon btn-neon-red btn-neon-sm">
                         {txStatus[prod.id] === 'cancelando' ? '⟳ Pausando...' : '⏸ Pausar Anúncio'}
                       </button>
                       <button
                         onClick={() => setRastreioId(rastreioId === prod.id ? null : prod.id)}
-                        className="text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-lg
-                          border border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/10 transition-all"
-                        style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        className="btn-neon btn-neon-cyan btn-neon-sm">
                         📦 Inserir Rastreio
                       </button>
                     </div>
@@ -595,12 +568,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                       <button
                         onClick={() => handleSetRastreio(prod.id, rastreioCode)}
                         disabled={txStatus[prod.id] === 'rastreando'}
-                        className="text-xs font-bold tracking-widest uppercase px-3 py-2 rounded-lg
-                          transition-all disabled:opacity-50"
-                        style={{ fontFamily: "'Orbitron', sans-serif",
-                          background: 'linear-gradient(135deg,#00e5ff,#7c3aed)',
-                          color: '#fff', border: 'none' }}>
-                        {txStatus[prod.id] === 'rastreando' ? '⟳' : '✓'}
+                        className="btn-neon btn-neon-filled btn-neon-sm">
+                        {txStatus[prod.id] === 'rastreando' ? '⟳' : '✓ Enviar'}
                       </button>
                     </div>
                   )}

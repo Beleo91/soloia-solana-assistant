@@ -98,16 +98,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
             Faça login para acessar o portal
           </p>
-          <button
-            onClick={login}
-            className="px-6 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
-              transition-all hover:shadow-[0_0_20px_rgba(74,222,128,0.3)] hover:-translate-y-0.5"
-            style={{
-              fontFamily: "'Orbitron', sans-serif",
-              background: 'linear-gradient(135deg,#4ade80,#22d3ee)',
-              color: '#000', border: 'none',
-            }}
-          >
+          <button onClick={login} className="btn-neon btn-neon-filled">
             Entrar
           </button>
         </div>
@@ -123,12 +114,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
           <p className="text-white/60 text-sm text-center">
             Conecte uma carteira para gerar seu link de afiliado.
           </p>
-          <button
-            onClick={() => connectWallet()}
-            className="px-6 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase border
-              border-yellow-400/40 text-yellow-300 hover:bg-yellow-400/10 transition-all"
-            style={{ fontFamily: "'Orbitron', sans-serif" }}
-          >
+          <button onClick={() => connectWallet()} className="btn-neon btn-neon-gold">
             Conectar Carteira
           </button>
         </div>
@@ -231,16 +217,9 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
 
                     <button
                       onClick={() => marcarClicado(missao.id, missao.url)}
-                      className="text-[11px] font-bold tracking-widest uppercase px-4 py-2 rounded-lg
-                        transition-all duration-200 flex items-center gap-1.5"
-                      style={{
-                        fontFamily: "'Orbitron', sans-serif",
-                        background: feita ? 'rgba(74,222,128,0.12)' : 'rgba(29,161,242,0.15)',
-                        border: `1px solid ${feita ? 'rgba(74,222,128,0.35)' : 'rgba(29,161,242,0.35)'}`,
-                        color: feita ? '#4ade80' : '#1DA1F2',
-                      }}
+                      className={`btn-neon btn-neon-sm ${feita ? 'btn-neon-green' : 'btn-neon-twitter'}`}
                     >
-                      {feita ? '✓ Seguido' : 'Seguir'}
+                      {feita ? '✓ Seguido' : '𝕏 Seguir'}
                     </button>
                   </div>
                 );
@@ -303,24 +282,16 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
             <button
               disabled={!todasMissoesFeitas}
               onClick={copiarLink}
-              className="w-full py-4 rounded-xl text-sm font-black tracking-widest uppercase
-                transition-all duration-500 relative overflow-hidden"
-              style={{
-                fontFamily: "'Orbitron', sans-serif",
-                background: todasMissoesFeitas
-                  ? copiado
-                    ? 'linear-gradient(135deg,#4ade80,#22d3ee)'
-                    : 'linear-gradient(135deg,#4ade80,#4ade80aa)'
-                  : 'rgba(255,255,255,0.04)',
-                border: todasMissoesFeitas
-                  ? '1px solid rgba(74,222,128,0.5)'
-                  : '1px solid rgba(255,255,255,0.08)',
-                color: todasMissoesFeitas ? '#000' : 'rgba(255,255,255,0.15)',
-                cursor: todasMissoesFeitas ? 'pointer' : 'not-allowed',
-                boxShadow: todasMissoesFeitas && !copiado
-                  ? '0 0 25px rgba(74,222,128,0.3), 0 0 50px rgba(74,222,128,0.1)'
-                  : 'none',
-              }}
+              className={`btn-neon btn-neon-full btn-neon-lg transition-all duration-500 ${
+                !todasMissoesFeitas
+                  ? 'btn-neon-cyan'
+                  : copiado
+                  ? 'btn-neon-filled'
+                  : 'btn-neon-green'
+              }`}
+              style={todasMissoesFeitas && !copiado ? {
+                boxShadow: '0 0 28px rgba(74,222,128,0.35), 0 0 55px rgba(74,222,128,0.12)',
+              } : undefined}
             >
               {copiado ? '✓ LINK COPIADO!' : todasMissoesFeitas ? '🔗 GERAR E COPIAR LINK' : '🔒 COMPLETE AS MISSÕES'}
             </button>
