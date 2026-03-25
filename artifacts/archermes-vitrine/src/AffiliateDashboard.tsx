@@ -1,25 +1,27 @@
 import { useState } from 'react';
 import { useWallet } from './walletContext';
-
-const MISSOES = [
-  {
-    id: 'ceo',
-    label: 'Seguir o CEO',
-    handle: '@bLeosoares',
-    url: 'https://twitter.com/intent/follow?screen_name=bLeosoares',
-    cor: '#1DA1F2',
-  },
-  {
-    id: 'rede',
-    label: 'Seguir a Rede',
-    handle: '@ARCHERMES1',
-    url: 'https://twitter.com/intent/follow?screen_name=ARCHERMES1',
-    cor: '#00e5ff',
-  },
-];
+import { useLang } from './i18n';
 
 export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void }) {
   const { isConnected, connect, address: walletAddress } = useWallet();
+  const { t, lang } = useLang();
+
+  const MISSOES = [
+    {
+      id: 'ceo',
+      label: lang === 'en' ? 'Follow the CEO' : 'Seguir o CEO',
+      handle: '@bLeosoares',
+      url: 'https://twitter.com/intent/follow?screen_name=bLeosoares',
+      cor: '#1DA1F2',
+    },
+    {
+      id: 'rede',
+      label: lang === 'en' ? 'Follow the Network' : 'Seguir a Rede',
+      handle: '@ARCHERMES1',
+      url: 'https://twitter.com/intent/follow?screen_name=ARCHERMES1',
+      cor: '#00e5ff',
+    },
+  ];
 
   const [clicados, setClicados] = useState<Set<string>>(new Set());
   const [copiado, setCopiado] = useState(false);
@@ -62,7 +64,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
         className="mb-8 text-xs text-white/40 hover:text-cyan-400 transition-colors flex items-center gap-2 tracking-widest uppercase"
         style={{ fontFamily: "'Orbitron', sans-serif" }}
       >
-        ← Voltar
+        {t('dash.back')}
       </button>
 
       {/* Título */}
@@ -77,11 +79,11 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
               textShadow: '0 0 30px rgba(74,222,128,0.5)',
             }}
           >
-            Portal do Divulgador
+            {t('affiliate.title')}
           </h1>
         </div>
         <p className="text-white/40 text-sm tracking-wide ml-11">
-          Ganhe <span className="text-green-400 font-bold">1% de comissão</span> em cada venda gerada pelo seu link — direto na blockchain.
+          {t('affiliate.subtitle')} <span className="text-green-400 font-bold">{t('affiliate.subtitleMid')}</span> {t('affiliate.subtitleEnd')}
         </p>
       </div>
 
@@ -94,10 +96,10 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
           <span className="text-5xl opacity-30">🔒</span>
           <p className="text-white/40 text-sm tracking-widest uppercase text-center"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            Conecte sua carteira para acessar o portal
+            {t('affiliate.connectWallet')}
           </p>
           <button onClick={() => void connect()} className="btn-neon btn-neon-filled">
-            Entrar
+            {t('affiliate.connect')}
           </button>
         </div>
       )}
@@ -113,13 +115,13 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
           >
             <h3 className="text-xs font-black tracking-widest uppercase text-white/50"
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
-              Como Funciona
+              {t('affiliate.howItWorks')}
             </h3>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { n: '01', txt: 'Complete as missões abaixo' },
-                { n: '02', txt: 'Gere seu link personalizado' },
-                { n: '03', txt: 'Ganhe 1% por cada venda' },
+                { n: '01', txt: t('affiliate.step1') },
+                { n: '02', txt: t('affiliate.step2') },
+                { n: '03', txt: t('affiliate.step3') },
               ].map(({ n, txt }) => (
                 <div key={n} className="flex flex-col items-center gap-2 text-center">
                   <span
@@ -153,7 +155,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black tracking-widest uppercase"
                 style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>
-                🎯 Missões para Liberar
+                {t('affiliate.missions')}
               </h3>
               <span
                 className="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full"
@@ -164,7 +166,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
                   color: todasMissoesFeitas ? '#4ade80' : 'rgba(255,255,255,0.3)',
                 }}
               >
-                {clicados.size}/{MISSOES.length} concluídas
+                {clicados.size}/{MISSOES.length} {lang === 'en' ? 'completed' : 'concluídas'}
               </span>
             </div>
 
@@ -201,7 +203,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
                       onClick={() => marcarClicado(missao.id, missao.url)}
                       className={`btn-neon btn-neon-sm ${feita ? 'btn-neon-green' : 'btn-neon-twitter'}`}
                     >
-                      {feita ? '✓ Seguido' : '𝕏 Seguir'}
+                      {feita ? t('affiliate.followed') : t('affiliate.follow')}
                     </button>
                   </div>
                 );
@@ -210,7 +212,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
 
             {!todasMissoesFeitas && (
               <p className="text-white/25 text-xs text-center tracking-wide">
-                Complete as missões acima para desbloquear seu link de afiliado
+                {t('affiliate.completeMissionsHint')}
               </p>
             )}
           </div>
@@ -232,7 +234,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
                 color: todasMissoesFeitas ? '#4ade80' : 'rgba(255,255,255,0.2)',
               }}
             >
-              🔗 Seu Link de Afiliado
+              {t('affiliate.yourLink')}
             </h3>
 
             {/* Preview do link */}
@@ -253,7 +255,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-white/30 tracking-widest uppercase"
                 style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                Sua carteira:
+                {t('affiliate.yourWallet')}
               </span>
               <span className="text-[11px] font-mono text-white/40">
                 {endereco.slice(0, 8)}…{endereco.slice(-6)}
@@ -275,7 +277,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
                 boxShadow: '0 0 28px rgba(74,222,128,0.35), 0 0 55px rgba(74,222,128,0.12)',
               } : undefined}
             >
-              {copiado ? '✓ LINK COPIADO!' : todasMissoesFeitas ? '🔗 GERAR E COPIAR LINK' : '🔒 COMPLETE AS MISSÕES'}
+              {copiado ? t('affiliate.copied') : todasMissoesFeitas ? t('affiliate.copyLink') : t('affiliate.completeMissions')}
             </button>
 
             {copiado && (
@@ -283,7 +285,7 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
                 className="text-center text-xs tracking-wide"
                 style={{ color: '#4ade80', textShadow: '0 0 10px rgba(74,222,128,0.5)' }}
               >
-                ✓ Link copiado! Cole em qualquer lugar para divulgar e ganhar comissão.
+                {t('affiliate.copiedDesc')}
               </div>
             )}
           </div>
@@ -295,16 +297,16 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
           >
             <h4 className="text-[10px] text-white/30 tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
-              Como a Comissão Funciona
+              {t('affiliate.howCommission')}
             </h4>
             <div className="grid grid-cols-2 gap-3 text-xs text-white/40 leading-relaxed">
               <div className="flex items-start gap-2">
                 <span className="text-green-400 mt-0.5">→</span>
-                <span>Quando alguém usa seu link e compra, o contrato registra seu endereço automaticamente</span>
+                <span>{t('affiliate.commission1')}</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-green-400 mt-0.5">→</span>
-                <span>1% do valor de cada venda é transferido para sua carteira on-chain sem intermediários</span>
+                <span>{t('affiliate.commission2')}</span>
               </div>
             </div>
           </div>

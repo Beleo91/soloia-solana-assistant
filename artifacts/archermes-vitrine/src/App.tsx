@@ -1,6 +1,7 @@
 import { PrivyProvider } from '@privy-io/react-auth';
 import { arcTestnet } from './chains';
 import { WalletProvider } from './walletContext';
+import { LangProvider } from './i18n';
 import HomePage from './HomePage';
 
 function App() {
@@ -24,7 +25,9 @@ function App() {
       }}
     >
       <WalletProvider>
-        <HomePage />
+        <LangProvider>
+          <HomePage />
+        </LangProvider>
       </WalletProvider>
     </PrivyProvider>
   );

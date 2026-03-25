@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from 'ethers';
 import { useWallet } from './walletContext';
+import { useLang } from './i18n';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 
@@ -54,6 +55,7 @@ type DashEstado = 'idle' | 'criando' | 'sucesso' | 'erro';
 
 export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const { isConnected, connect, address: walletAddress, switchToArc, getProvider } = useWallet();
+  const { t, lang } = useLang();
 
   const [loja, setLoja] = useState<StoreInfo | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -310,9 +312,9 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const neonAtual = NEON_OPTIONS.find((n) => n.value === customizacao.neonColor) ?? NEON_OPTIONS[0];
 
   const abas = [
-    { id: 'loja', label: '⬡ Minha Loja' },
-    { id: 'produtos', label: '📦 Produtos' },
-    { id: 'visual', label: '🎨 Visual' },
+    { id: 'loja', label: t('dash.tab.myStore') },
+    { id: 'produtos', label: t('dash.tab.products') },
+    { id: 'visual', label: t('dash.tab.visual') },
   ] as const;
 
   return (
@@ -321,7 +323,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       <button onClick={onVoltar}
         className="mb-8 text-xs text-white/40 hover:text-cyan-400 transition-colors flex items-center gap-2 tracking-widest uppercase"
         style={{ fontFamily: "'Orbitron', sans-serif" }}>
-        ← Voltar
+        {t('dash.back')}
       </button>
 
       {/* Título */}
@@ -329,10 +331,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
         <h1 className="text-3xl font-black tracking-widest uppercase mb-2"
           style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor,
             textShadow: `0 0 30px ${neonAtual.shadow}` }}>
-          Painel do Lojista
+          {t('dash.title')}
         </h1>
         <p className="text-white/40 text-sm tracking-wide">
-          Gerencie sua loja no marketplace descentralizado ARCHERMES
+          {t('dash.subtitle')}
         </p>
       </div>
 
@@ -342,10 +344,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           <div className="text-5xl opacity-30">🔒</div>
           <p className="text-white/40 text-sm tracking-widest uppercase"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            Conecte sua carteira para acessar sua loja
+            {t('dash.connectWallet')}
           </p>
           <button onClick={() => void connect()} className="btn-neon btn-neon-filled btn-neon-lg">
-            Entrar
+            {t('dash.connect')}
           </button>
         </div>
       )}
@@ -355,7 +357,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
           <p className="text-cyan-400/60 text-sm tracking-widest uppercase"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            Consultando blockchain...
+            {t('dash.loading')}
           </p>
         </div>
       )}
@@ -367,12 +369,12 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           <div className="text-5xl">✅</div>
           <h2 className="text-xl font-black tracking-widest uppercase"
             style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff' }}>
-            Loja Criada com Sucesso!
+            {t('dash.storeCreated')}
           </h2>
-          <p className="text-white/60 text-sm">Sua loja está ativa na Arc Testnet.</p>
+          <p className="text-white/60 text-sm">{t('dash.storeActive')}</p>
           <button onClick={() => { setEstado('idle'); setCarregando(true); }}
             className="btn-neon btn-neon-cyan">
-            Ver Minha Loja
+            {t('dash.viewMyStore')}
           </button>
         </div>
       )}
@@ -383,15 +385,15 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           <div>
             <h2 className="text-lg font-black tracking-widest uppercase mb-1"
               style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>
-              Escolha seu Plano
+              {t('dash.choosePlan')}
             </h2>
-            <p className="text-white/40 text-sm">Crie sua loja on-chain e comece a vender na Arc Testnet.</p>
+            <p className="text-white/40 text-sm">{t('dash.createDesc')}</p>
           </div>
 
           <div className="flex flex-col gap-2 max-w-md">
             <label className="text-xs text-white/50 tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
-              Nome da sua loja
+              {t('dash.storeName')}
             </label>
             <input type="text" placeholder="Ex: Sneakers Store" value={nomeLoja}
               onChange={(e) => setNomeLoja(e.target.value)}
@@ -409,9 +411,9 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
               onClick={() => setPlanoPro(false)}>
               <div>
                 <p className="text-[10px] text-cyan-400 tracking-widest uppercase mb-1"
-                  style={{ fontFamily: "'Orbitron', sans-serif" }}>Plano</p>
+                  style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.plan')}</p>
                 <h3 className="text-xl font-black tracking-widest uppercase"
-                  style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>Básico</h3>
+                  style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>{t('dash.basic')}</h3>
               </div>
               <p className="text-3xl font-black" style={{ color: '#00e5ff', fontFamily: "'Orbitron', sans-serif" }}>
                 {basicFee}<span className="text-base text-white/40 ml-1 font-normal">ETH</span>
@@ -522,7 +524,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                       {loja!.tier === 0 && (
                         <span className="text-[10px] font-bold tracking-widest bg-cyan-500/10
                           border border-cyan-400/30 text-cyan-400 px-2 py-0.5 rounded-full"
-                          style={{ fontFamily: "'Orbitron', sans-serif" }}>BÁSICO</span>
+                          style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.basic')}</span>
                       )}
                     </div>
                     <p className="text-white/30 text-xs font-mono">{enderecoUsuario}</p>
@@ -532,16 +534,16 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-xl border border-white/5 p-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-1">Produtos</p>
+                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-1">{t('dash.products')}</p>
                     <p className="text-2xl font-black" style={{ color: customizacao.neonColor, fontFamily: "'Orbitron', sans-serif" }}>
                       {Number(loja!.productCount)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/5 p-4" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-1">Expira em</p>
+                    <p className="text-[10px] text-white/30 tracking-widest uppercase mb-1">{t('dash.expiresIn')}</p>
                     <p className="text-sm font-bold"
                       style={{ color: expirou ? '#f87171' : customizacao.neonColor, fontFamily: "'Orbitron', sans-serif" }}>
-                      {expirou ? '⚠ Expirado' : new Date(Number(loja!.expiresAt) * 1000).toLocaleDateString('pt-BR')}
+                      {expirou ? t('dash.expired') : new Date(Number(loja!.expiresAt) * 1000).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                 </div>
@@ -551,11 +553,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   {loja!.tier === 0 && (
                     <button onClick={handleUpgradePro}
                       className="btn-neon btn-neon-filled-gold btn-neon-full btn-neon-lg">
-                      ⚡ FAZER UPGRADE PARA PRO — {proFee} ETH
+                      {t('dash.upgradePro')} {proFee} ETH
                     </button>
                   )}
                   <button onClick={handleRenovar} className="btn-neon btn-neon-cyan btn-neon-full">
-                    ↻ Renovar Assinatura
+                    {t('dash.renew')}
                   </button>
                 </div>
               </div>
@@ -568,12 +570,12 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-black tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  Meus Anúncios
+                  {t('dash.myProducts')}
                 </h3>
                 <button onClick={carregarMeusProdutos}
                   className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                  ↻ Atualizar
+                  {t('vitrine.refresh')}
                 </button>
               </div>
 
@@ -581,7 +583,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div className="flex items-center justify-center py-12 gap-3">
                   <div className="w-6 h-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
                   <span className="text-cyan-400/60 text-xs tracking-widest"
-                    style={{ fontFamily: "'Orbitron', sans-serif" }}>Carregando...</span>
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.loadingProducts')}</span>
                 </div>
               )}
 
@@ -589,7 +591,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div className="flex flex-col items-center py-16 gap-3">
                   <span className="text-4xl opacity-20">⬡</span>
                   <p className="text-white/30 text-xs tracking-widest uppercase"
-                    style={{ fontFamily: "'Orbitron', sans-serif" }}>Nenhum produto anunciado</p>
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.noProducts')}</p>
                 </div>
               )}
 
@@ -602,15 +604,15 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         <span className="text-[10px] font-mono text-white/20">#{prod.id}</span>
                         {prod.isSold && (
                           <span className="text-[9px] font-bold tracking-widest bg-green-500/10 border border-green-400/30 text-green-400 px-1.5 py-0.5 rounded-full"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>VENDIDO</span>
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.sold')}</span>
                         )}
                         {!prod.isActive && !prod.isSold && (
                           <span className="text-[9px] font-bold tracking-widest bg-red-500/10 border border-red-400/30 text-red-400 px-1.5 py-0.5 rounded-full"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>PAUSADO</span>
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.paused')}</span>
                         )}
                         {prod.isActive && !prod.isSold && (
                           <span className="text-[9px] font-bold tracking-widest bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>ATIVO</span>
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.active')}</span>
                         )}
                       </div>
                       <h4 className="font-bold text-sm text-white leading-tight"
@@ -630,17 +632,17 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         onClick={() => handleCancelarItem(prod.id)}
                         disabled={txStatus[prod.id] === 'cancelando'}
                         className="btn-neon btn-neon-red btn-neon-sm">
-                        {txStatus[prod.id] === 'cancelando' ? '⟳ Pausando...' : '⏸ Pausar Anúncio'}
+                        {txStatus[prod.id] === 'cancelando' ? `⟳ ${t('dash.canceling')}` : `⏸ ${t('dash.cancelItem')}`}
                       </button>
                       <button
                         onClick={() => setRastreioId(rastreioId === prod.id ? null : prod.id)}
                         className="btn-neon btn-neon-cyan btn-neon-sm">
-                        📦 Inserir Rastreio
+                        📦 {t('dash.addTracking')}
                       </button>
                       <button
                         onClick={() => handleExcluirItem(prod.id)}
                         className="btn-neon btn-neon-sm btn-neon-delete">
-                        🗑 Excluir Anúncio
+                        🗑 {t('dash.deleteItem')}
                       </button>
                     </div>
                   )}
@@ -667,13 +669,13 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   )}
 
                   {txStatus[prod.id] === 'rastreado' && (
-                    <p className="text-green-400 text-xs">✓ Código de rastreio salvo na blockchain!</p>
+                    <p className="text-green-400 text-xs">✓ {t('dash.trackingSaved')}</p>
                   )}
                   {txStatus[prod.id] === 'cancelado' && (
-                    <p className="text-red-400 text-xs">Anúncio pausado com sucesso.</p>
+                    <p className="text-red-400 text-xs">{t('dash.listingPaused')}</p>
                   )}
                   {txStatus[prod.id] === 'erro' && (
-                    <p className="text-red-400 text-xs">⚠ Erro na transação. Tente novamente.</p>
+                    <p className="text-red-400 text-xs">⚠ {t('dash.txError')}</p>
                   )}
                 </div>
               ))}
@@ -685,7 +687,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
             <div className="flex flex-col gap-6">
               <h3 className="text-sm font-black tracking-widest uppercase"
                 style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                Identidade Visual
+                {t('dash.visual.title')}
               </h3>
 
               {/* ── BANNER ── */}
@@ -693,7 +695,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
                 <label className="text-xs font-bold tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  🖼 Banner da Loja
+                  🖼 {t('dash.visual.banner')}
                 </label>
 
                 {/* Preview atual */}
@@ -713,7 +715,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div>
                   <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    Banners Pré-definidos
+                    {t('dash.visual.presets')}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {PRESET_BANNERS.map((b) => (
@@ -742,7 +744,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div>
                   <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    Upload de Banner Personalizado
+                    {t('dash.visual.upload')}
                   </p>
                   <input ref={bannerInputRef} type="file" accept="image/*"
                     className="hidden" onChange={onBannerInput} />
@@ -762,7 +764,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                       <>
                         <span className="text-xl spinner" style={{ display: 'inline-block', color: customizacao.neonColor }}>⟳</span>
                         <span className="text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                          Carregando banner...
+                          {t('dash.visual.converting')}
                         </span>
                       </>
                     ) : (
@@ -770,7 +772,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         <span className="text-xl">🖼</span>
                         <span className="text-xs text-white/30 tracking-widest"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          Arraste ou clique para enviar
+                          {t('dash.visual.uploadBanner')}
                         </span>
                         <span className="text-[10px] text-white/20">PNG, JPG, WEBP — máx. 5MB</span>
                       </>
@@ -784,7 +786,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
                 <label className="text-xs font-bold tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  👤 Foto de Perfil
+                  👤 {t('dash.visual.avatar')}
                 </label>
 
                 {/* Preview atual */}
@@ -800,7 +802,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         ✕
                       </button>
                     </div>
-                    <span className="text-xs text-white/30">Foto de perfil atual</span>
+                    <span className="text-xs text-white/30">{lang === 'en' ? 'Current profile photo' : 'Foto de perfil atual'}</span>
                   </div>
                 )}
 
@@ -808,7 +810,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div>
                   <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    Avatares Pré-definidos
+                    {t('dash.visual.presets')}
                   </p>
                   <div className="flex gap-3 flex-wrap">
                     {PRESET_AVATARS.map((a) => (
@@ -835,7 +837,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 <div>
                   <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    Upload de Logo Personalizado
+                    {t('dash.visual.upload')}
                   </p>
                   <input ref={avatarInputRef} type="file" accept="image/*"
                     className="hidden" onChange={onAvatarInput} />
@@ -855,7 +857,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                       <>
                         <span className="text-xl spinner" style={{ display: 'inline-block', color: customizacao.neonColor }}>⟳</span>
                         <span className="text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                          Carregando logo...
+                          {t('dash.visual.converting')}
                         </span>
                       </>
                     ) : (
@@ -863,9 +865,9 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         <span className="text-xl">👤</span>
                         <span className="text-xs text-white/30 tracking-widest"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          Arraste ou clique para enviar
+                          {t('dash.visual.uploadAvatar')}
                         </span>
-                        <span className="text-[10px] text-white/20">PNG, JPG, WEBP — recomendado 1:1</span>
+                        <span className="text-[10px] text-white/20">PNG, JPG, WEBP — {lang === 'en' ? 'recommended 1:1' : 'recomendado 1:1'}</span>
                       </>
                     )}
                   </div>
@@ -877,7 +879,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                 style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
                 <label className="text-xs font-bold tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  ⚡ Cor do Neon
+                  ⚡ {t('dash.visual.neon')}
                 </label>
                 <div className="flex gap-3 flex-wrap">
                   {NEON_OPTIONS.map((op) => (
@@ -898,7 +900,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   ))}
                 </div>
                 <p className="text-white/20 text-xs">
-                  A cor do neon é salva localmente e personaliza seu painel.
+                  {lang === 'en' ? 'Neon color is saved locally and personalizes your panel.' : 'A cor do neon é salva localmente e personaliza seu painel.'}
                 </p>
               </div>
             </div>

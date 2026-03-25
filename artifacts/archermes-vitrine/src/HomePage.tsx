@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
 import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { useWallet } from './walletContext';
+import { useLang } from './i18n';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import {
@@ -231,6 +232,7 @@ function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
 
 export default function HomePage() {
   const { connect, disconnect, isConnected, address: walletAddress, switchToArc, getProvider } = useWallet();
+  const { t, lang, toggleLang } = useLang();
 
   const [pagina, setPagina] = useState<Pagina>('home');
   const [modalAberto, setModalAberto] = useState(false);
@@ -497,26 +499,40 @@ export default function HomePage() {
         </div>
         {!isConnected ? (
           <div className="acoes-header">
+            <button
+              onClick={toggleLang}
+              className="btn-entrar"
+              style={{ fontSize: '0.72rem', letterSpacing: '0.08em', minWidth: 0, padding: '0.35rem 0.65rem',
+                borderColor: 'rgba(0,229,255,0.35)', color: 'rgba(0,229,255,0.7)' }}>
+              🌐 {t('lang.toggle')}
+            </button>
             <button onClick={() => setPagina('afiliado')} className="btn-entrar"
               style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80' }}>
-              🔗 Afiliar
+              {t('nav.affiliate')}
             </button>
-            <button onClick={() => setPagina('minha-loja')} className="btn-entrar">Minha Loja</button>
-            <button onClick={() => void connect()} className="btn-entrar">Entrar</button>
-            <button onClick={() => void connect()} className="btn-login">Criar Minha Loja</button>
+            <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStore')}</button>
+            <button onClick={() => void connect()} className="btn-entrar">{t('nav.connect')}</button>
+            <button onClick={() => void connect()} className="btn-login">{t('nav.createStore')}</button>
           </div>
         ) : (
           <div className="painel-usuario">
+            <button
+              onClick={toggleLang}
+              className="btn-entrar"
+              style={{ fontSize: '0.72rem', letterSpacing: '0.08em', minWidth: 0, padding: '0.35rem 0.65rem',
+                borderColor: 'rgba(0,229,255,0.35)', color: 'rgba(0,229,255,0.7)' }}>
+              🌐 {t('lang.toggle')}
+            </button>
             <span style={{ fontSize: '0.82rem' }}>
               {abreviarEndereco(walletAddress || '0x...')}
             </span>
             <button onClick={() => setPagina('afiliado')} className="btn-entrar"
               style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80', fontSize: '0.7rem' }}>
-              🔗 Afiliar
+              {t('nav.affiliate')}
             </button>
-            <button onClick={() => setPagina('minha-loja')} className="btn-entrar">⬡ Minha Loja</button>
-            <button onClick={abrirModal} className="btn-anunciar">+ Anunciar</button>
-            <button onClick={disconnect} className="btn-sair">Sair</button>
+            <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStoreIcon')}</button>
+            <button onClick={abrirModal} className="btn-anunciar">{t('nav.list')}</button>
+            <button onClick={disconnect} className="btn-sair">{t('nav.disconnect')}</button>
           </div>
         )}
       </header>
@@ -527,8 +543,8 @@ export default function HomePage() {
           style={{ background: 'rgba(74,222,128,0.08)', borderBottom: '1px solid rgba(74,222,128,0.15)',
             color: '#4ade80', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}>
           <span>🔗</span>
-          <span>Link de afiliado ativo: {abreviarEndereco(refAddress)}</span>
-          <span className="text-white/20">— 1% da comissão vai para o divulgador</span>
+          <span>{t('ref.active')} {abreviarEndereco(refAddress)}</span>
+          <span className="text-white/20">{t('ref.commission')}</span>
         </div>
       )}
 
@@ -540,7 +556,7 @@ export default function HomePage() {
             <h2 className="text-base font-black tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24',
                 textShadow: '0 0 16px rgba(251,191,36,0.5)' }}>
-              Lojas em Destaque
+              {t('section.featured')}
             </h2>
             <span className="text-[10px] text-white/30 tracking-widest font-mono ml-1">VIP PRO MEMBERS</span>
           </div>
@@ -557,7 +573,9 @@ export default function HomePage() {
                     ⚡ VIP PRO
                   </span>
                   <span className="text-[10px] text-white/30 mt-0.5">
-                    {loja.productCount} produto{loja.productCount !== 1 ? 's' : ''}
+                    {loja.productCount} {lang === 'en'
+                      ? `product${loja.productCount !== 1 ? 's' : ''}`
+                      : `produto${loja.productCount !== 1 ? 's' : ''}`}
                   </span>
                 </div>
               </div>
@@ -575,10 +593,10 @@ export default function HomePage() {
             <h2 className="text-xl font-black tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
                 textShadow: '0 0 20px rgba(0,229,255,0.5)' }}>
-              Lojas Parceiras
+              {t('section.partners')}
             </h2>
             <p className="text-white/30 text-xs tracking-wide mt-0.5">
-              Marketplaces verificadas na Arc Testnet
+              {t('section.partnersDesc')}
             </p>
           </div>
         </div>
@@ -633,10 +651,10 @@ export default function HomePage() {
             <h2 className="text-xl font-black tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24',
                 textShadow: '0 0 20px rgba(251,191,36,0.5)' }}>
-              Produtos Impulsionados
+              {t('section.boosted')}
             </h2>
             <p className="text-white/30 text-xs tracking-wide mt-0.5">
-              Destaques selecionados nesta semana
+              {t('section.boostedDesc')}
             </p>
           </div>
         </div>
@@ -660,7 +678,7 @@ export default function HomePage() {
                   style={{ color: corBorda, borderColor: corBorda + '55',
                     background: corBorda + '18',
                     boxShadow: `0 0 8px ${corSombra}` }}>
-                  ⚡ IMPULSIONADO
+                  {t('section.boostedBadge')}
                 </span>
                 <div className="impulsionado-img-wrap">
                   <img src={item.image} alt={item.itemName} className="impulsionado-img" loading="lazy" />
@@ -695,7 +713,7 @@ export default function HomePage() {
                     style={{ borderColor: corBorda + '55', color: corBorda,
                       background: corBorda + '12' }}
                     onClick={() => void connect()}>
-                    🔒 Entrar para comprar
+                    {t('vitrine.connectToBuyBtn')}
                   </button>
                 </div>
               </div>
@@ -712,17 +730,17 @@ export default function HomePage() {
             <h2 className="text-2xl font-black tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
                 textShadow: '0 0 20px rgba(0,229,255,0.5)' }}>
-              ⬡ Vitrine On-Chain
+              {t('section.vitrine')}
             </h2>
             <p className="text-white/40 text-sm mt-1 tracking-wide">
-              Produtos registrados na Arc Testnet em tempo real
+              {t('section.vitrineDesc')}
             </p>
           </div>
           <button onClick={carregarVitrine}
             className="text-xs text-cyan-400 border border-cyan-400/30 px-3 py-1.5 rounded-md
               hover:bg-cyan-400/10 transition-all duration-200 tracking-widest uppercase"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            ↻ Atualizar
+            {t('vitrine.refresh')}
           </button>
         </div>
 
@@ -735,7 +753,7 @@ export default function HomePage() {
                     ? 'border-cyan-400 text-cyan-400 bg-cyan-400/10 shadow-[0_0_12px_rgba(0,229,255,0.2)]'
                     : 'border-white/10 text-white/30 hover:border-white/20 hover:text-white/50'}`}
                 style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                {cat}
+                {cat === 'Todos' ? t('vitrine.all') : cat}
               </button>
             ))}
           </div>
@@ -746,7 +764,7 @@ export default function HomePage() {
             <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
             <p className="text-cyan-400/60 text-sm tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
-              Sincronizando com a blockchain...
+              {t('vitrine.loading')}
             </p>
           </div>
         )}
@@ -755,7 +773,7 @@ export default function HomePage() {
           <div className="flex flex-col items-center py-16 gap-3">
             <span className="text-3xl">⚠️</span>
             <p className="text-red-400 text-sm">{erroVitrine}</p>
-            <button onClick={carregarVitrine} className="text-xs text-cyan-400 underline mt-1">Tentar novamente</button>
+            <button onClick={carregarVitrine} className="text-xs text-cyan-400 underline mt-1">{t('vitrine.retry')}</button>
           </div>
         )}
 
@@ -764,13 +782,13 @@ export default function HomePage() {
             <div className="text-5xl opacity-30">⬡</div>
             <p className="text-white/30 text-sm tracking-widest uppercase"
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
-              Nenhum produto encontrado
+              {t('vitrine.empty')}
             </p>
             {isConnected && (
               <button onClick={abrirModal}
                 className="mt-2 text-xs text-cyan-400 border border-cyan-400/30 px-4 py-2 rounded-lg
                   hover:bg-cyan-400/10 transition-all duration-200">
-                + Anunciar o primeiro produto
+                {t('vitrine.addFirst')}
               </button>
             )}
           </div>
@@ -855,7 +873,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-end justify-between">
                     <div>
-                      <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
+                      <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">{t('vitrine.price')}</p>
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-lg font-black"
                           style={{ color: isPro ? '#fbbf24' : (item.currency === 'USDC' ? '#4ade80' : item.currency === 'EURC' ? '#60a5fa' : '#00e5ff'), fontFamily: "'Orbitron', sans-serif",
@@ -884,7 +902,7 @@ export default function HomePage() {
                     className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
                     onClick={() => abrirCompra(item)}
                   >
-                    {isConnected ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
+                    {isConnected ? t('vitrine.buyNow') : t('vitrine.connectToBuy')}
                   </button>
                 </div>
               );
@@ -899,11 +917,14 @@ export default function HomePage() {
 
       {/* ── CATEGORIAS ── */}
       <section className="area-nichos">
-        <h2>Explore por Categorias</h2>
+        <h2>{t('section.categories')}</h2>
         <div className="grid-categorias">
-          {[['👕','Moda'],['📱','Eletrônicos'],['💧','Perfumes e Beleza'],['🎮','Games']].map(([icone, nome]) => (
-            <button key={nome} className="btn-nicho" onClick={() => setFiltroCategoria(nome)}>
-              <span className="icone">{icone}</span> {nome}
+          {([['👕', lang === 'en' ? 'Fashion' : 'Moda', 'Moda'],
+             ['📱', lang === 'en' ? 'Electronics' : 'Eletrônicos', 'Eletrônicos'],
+             ['💧', lang === 'en' ? 'Perfumes & Beauty' : 'Perfumes e Beleza', 'Perfumes e Beleza'],
+             ['🎮', 'Games', 'Games']] as [string, string, string][]).map(([icone, label, filtroVal]) => (
+            <button key={filtroVal} className="btn-nicho" onClick={() => setFiltroCategoria(filtroVal)}>
+              <span className="icone">{icone}</span> {label}
             </button>
           ))}
         </div>
@@ -918,10 +939,10 @@ export default function HomePage() {
             {estado === 'sem-carteira' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
-                <h2>Carteira não encontrada</h2>
-                <p>Conecte uma carteira para publicar na blockchain.</p>
-                <button className="btn-publicar" onClick={() => { void connect(); setEstado('idle'); }}>Conectar Carteira</button>
-                <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }} onClick={() => setEstado('idle')}>Voltar</button>
+                <h2>{t('modal.list.noWallet')}</h2>
+                <p>{t('modal.list.noWalletDesc')}</p>
+                <button className="btn-publicar" onClick={() => { void connect(); setEstado('idle'); }}>{t('modal.list.connectWallet')}</button>
+                <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }} onClick={() => setEstado('idle')}>{t('modal.list.back')}</button>
               </div>
             )}
 
@@ -929,22 +950,22 @@ export default function HomePage() {
               <>
                 <div className="modal-topo">
                   <span className="modal-icone">⬡</span>
-                  <h2>Anunciar Produto</h2>
-                  <p>Preencha os dados do item para publicar no marketplace</p>
+                  <h2>{t('modal.list.title')}</h2>
+                  <p>{t('modal.list.subtitle')}</p>
                 </div>
                 <form className="modal-form" onSubmit={handlePublicar}>
                   <div className="campo">
-                    <label>Nome do Item</label>
-                    <input name="nomeItem" type="text" placeholder="Ex: Tênis Air Max Limited"
+                    <label>{t('modal.list.itemName')}</label>
+                    <input name="nomeItem" type="text" placeholder={t('modal.list.itemNamePlaceholder')}
                       value={form.nomeItem} onChange={handleChange} required autoComplete="off" />
                   </div>
                   <div className="campo">
-                    <label>Preço (ETH)</label>
-                    <input name="preco" type="number" placeholder="Ex: 0.05"
+                    <label>{t('modal.list.price')}</label>
+                    <input name="preco" type="number" placeholder={t('modal.list.pricePlaceholder')}
                       step="0.000000000000000001" min="0" value={form.preco} onChange={handleChange} required />
                   </div>
                   <div className="campo">
-                    <label>Categoria</label>
+                    <label>{t('modal.list.category')}</label>
                     <select name="categoria" value={form.categoria} onChange={handleChange}
                       style={{ background: 'rgba(255,255,255,0.05)', color: '#fff',
                         border: '1px solid rgba(0,229,255,0.18)', borderRadius: '8px',
@@ -954,7 +975,7 @@ export default function HomePage() {
                   </div>
                   {/* Upload de imagens */}
                   <div className="campo">
-                    <label>Imagens do Produto</label>
+                    <label>{t('modal.list.images')}</label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -973,14 +994,14 @@ export default function HomePage() {
                       {convertingImages ? (
                         <>
                           <span className="upload-dropzone-icon spinner" style={{ display: 'inline-block' }}>⟳</span>
-                          <span className="upload-dropzone-text" style={{ color: '#00e5ff' }}>Carregando imagens...</span>
-                          <span className="upload-dropzone-sub">Convertendo arquivos, aguarde</span>
+                          <span className="upload-dropzone-text" style={{ color: '#00e5ff' }}>{t('modal.list.uploadLoading')}</span>
+                          <span className="upload-dropzone-sub">{t('modal.list.uploadConverting')}</span>
                         </>
                       ) : (
                         <>
                           <span className="upload-dropzone-icon">📷</span>
-                          <span className="upload-dropzone-text">Clique ou arraste as imagens do produto aqui</span>
-                          <span className="upload-dropzone-sub">PNG, JPG, WEBP · múltiplos arquivos aceitos</span>
+                          <span className="upload-dropzone-text">{t('modal.list.uploadClick')}</span>
+                          <span className="upload-dropzone-sub">{t('modal.list.uploadFormats')}</span>
                         </>
                       )}
                     </div>
@@ -1005,7 +1026,7 @@ export default function HomePage() {
                   </div>
 
                   {estado === 'erro' && <div className="modal-erro">⚠️ {erroMsg}</div>}
-                  <button type="submit" className="btn-publicar">🚀 Publicar no Marketplace</button>
+                  <button type="submit" className="btn-publicar">{t('modal.list.publish')}</button>
                 </form>
               </>
             )}
@@ -1013,18 +1034,18 @@ export default function HomePage() {
             {estado === 'enviando' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone spinner">⟳</div>
-                <h2>Aguardando confirmação...</h2>
-                <p>Confirme a transação na sua carteira.</p>
+                <h2>{t('modal.list.waiting')}</h2>
+                <p>{t('modal.list.waitingDesc')}</p>
               </div>
             )}
 
             {estado === 'sucesso' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone">✓</div>
-                <h2>Produto postado na Blockchain!</h2>
-                <p><strong>{form.nomeItem}</strong> foi listado com sucesso.</p>
+                <h2>{t('modal.list.success')}</h2>
+                <p><strong>{form.nomeItem}</strong> {t('modal.list.successDesc')}</p>
                 {txHash && <p className="contrato-info">TX: <code>{txHash.slice(0,12)}…{txHash.slice(-6)}</code></p>}
-                <button onClick={fecharModal} className="btn-publicar">Fechar</button>
+                <button onClick={fecharModal} className="btn-publicar">{t('modal.list.close')}</button>
               </div>
             )}
           </div>
@@ -1041,21 +1062,21 @@ export default function HomePage() {
               <>
                 <div className="modal-topo">
                   <span className="modal-icone">⚡</span>
-                  <h2>Confirmar Compra</h2>
-                  <p>Revise os detalhes antes de confirmar na blockchain</p>
+                  <h2>{t('modal.buy.title')}</h2>
+                  <p>{t('modal.buy.subtitle')}</p>
                 </div>
                 <div className="flex flex-col gap-4 mt-2">
                   <div className="rounded-xl border border-white/10 p-4 flex flex-col gap-2"
                     style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <p className="text-xs text-white/40 tracking-widest uppercase"
-                      style={{ fontFamily: "'Orbitron', sans-serif" }}>Produto</p>
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('modal.buy.product')}</p>
                     <p className="font-bold text-white text-sm"
                       style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.05em' }}>
                       {itemParaComprar.itemName}
                     </p>
-                    <p className="text-white/30 text-xs font-mono">Vendedor: {abreviarEndereco(itemParaComprar.seller)}</p>
+                    <p className="text-white/30 text-xs font-mono">{t('vitrine.seller')} {abreviarEndereco(itemParaComprar.seller)}</p>
                     {itemParaComprar.category && (
-                      <p className="text-white/30 text-xs">Categoria: {itemParaComprar.category}</p>
+                      <p className="text-white/30 text-xs">{t('vitrine.category')} {itemParaComprar.category}</p>
                     )}
                   </div>
 
@@ -1073,7 +1094,7 @@ export default function HomePage() {
                         style={{ background: fundo, borderColor: borda }}>
                         <div className="flex flex-col gap-1">
                           <span className="text-xs text-white/50 tracking-widest uppercase"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>Total</span>
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('modal.buy.total')}</span>
                           {meta && (
                             <span className="currency-badge" style={{
                               color: meta.cor, background: meta.corFundo, borderColor: meta.cor + '55',
@@ -1099,16 +1120,16 @@ export default function HomePage() {
                       <div>
                         <p className="text-green-400 text-[11px] font-bold tracking-widest"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          Link de afiliado ativo
+                          {t('modal.buy.affiliateActive')}
                         </p>
                         <p className="text-white/30 text-[10px] font-mono">{abreviarEndereco(refAddress)}</p>
                       </div>
-                      <span className="ml-auto text-green-400/60 text-[10px]">+1% comissão</span>
+                      <span className="ml-auto text-green-400/60 text-[10px]">{t('modal.buy.affiliateCommission')}</span>
                     </div>
                   )}
 
                   <button onClick={confirmarCompra} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
-                    ⚡ Confirmar Compra
+                    {t('modal.buy.confirm')}
                   </button>
                 </div>
               </>
@@ -1117,11 +1138,14 @@ export default function HomePage() {
             {buyEstado === 'confirmando' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone spinner">⟳</div>
-                <h2>Processando na blockchain...</h2>
+                <h2>{t('modal.buy.processing')}</h2>
                 {(itemParaComprar?.currency === 'USDC' || itemParaComprar?.currency === 'EURC') ? (
-                  <p>Confirme as <strong>2 transações</strong> na sua carteira: <em>Approve</em> e depois a transferência.</p>
+                  <p>{lang === 'en'
+                    ? <>Confirm the <strong>2 transactions</strong> in your wallet: <em>Approve</em> then the transfer.</>
+                    : <>Confirme as <strong>2 transações</strong> na sua carteira: <em>Approve</em> e depois a transferência.</>}
+                  </p>
                 ) : (
-                  <p>Confirme a transação na sua carteira e aguarde.</p>
+                  <p>{t('modal.buy.confirmingDesc')}</p>
                 )}
               </div>
             )}
@@ -1130,11 +1154,11 @@ export default function HomePage() {
               <div className="modal-sucesso">
                 <div className="sucesso-icone" style={{ borderColor: '#4ade80', color: '#4ade80',
                   boxShadow: '0 0 24px rgba(74,222,128,0.35)' }}>✓</div>
-                <h2 style={{ color: '#4ade80' }}>Compra Realizada!</h2>
-                <p><strong>{itemParaComprar?.itemName}</strong> é seu!</p>
+                <h2 style={{ color: '#4ade80' }}>{t('modal.buy.success')}</h2>
+                <p><strong>{itemParaComprar?.itemName}</strong> {lang === 'en' ? 'is yours!' : 'é seu!'}</p>
                 {buyTx && <p className="contrato-info">TX: <code>{buyTx.slice(0,12)}…{buyTx.slice(-6)}</code></p>}
                 <button onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }} className="btn-publicar">
-                  Fechar
+                  {t('modal.list.close')}
                 </button>
               </div>
             )}
@@ -1142,12 +1166,12 @@ export default function HomePage() {
             {buyEstado === 'erro' && (
               <div className="modal-sucesso">
                 <div className="sucesso-icone" style={{ borderColor: '#f87171', color: '#f87171' }}>✕</div>
-                <h2>Erro na transação</h2>
+                <h2>{t('modal.buy.error')}</h2>
                 <div className="modal-erro" style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
                   {buyErro}
                 </div>
                 <button onClick={() => setBuyEstado('idle')} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
-                  Tentar Novamente
+                  {t('modal.buy.retry')}
                 </button>
               </div>
             )}
