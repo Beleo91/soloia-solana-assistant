@@ -79,6 +79,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
 
   const [dragOverBanner, setDragOverBanner] = useState(false);
   const [dragOverAvatar, setDragOverAvatar] = useState(false);
+  const [convertingBanner, setConvertingBanner] = useState(false);
+  const [convertingAvatar, setConvertingAvatar] = useState(false);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,34 +108,53 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
     try { localStorage.setItem(`${LS_KEY}_${enderecoUsuario}`, JSON.stringify(next)); } catch { /* ignore */ }
   }
 
-  function handleBannerFile(file: File) {
-    const url = URL.createObjectURL(file);
-    salvarCustomizacao({ ...customizacao, bannerUrl: url });
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
-  function handleAvatarFile(file: File) {
-    const url = URL.createObjectURL(file);
-    salvarCustomizacao({ ...customizacao, avatarUrl: url });
+  async function handleBannerFile(file: File) {
+    setConvertingBanner(true);
+    try {
+      const base64 = await fileToBase64(file);
+      salvarCustomizacao({ ...customizacao, bannerUrl: base64 });
+    } finally {
+      setConvertingBanner(false);
+    }
+  }
+
+  async function handleAvatarFile(file: File) {
+    setConvertingAvatar(true);
+    try {
+      const base64 = await fileToBase64(file);
+      salvarCustomizacao({ ...customizacao, avatarUrl: base64 });
+    } finally {
+      setConvertingAvatar(false);
+    }
   }
 
   function onBannerInput(e: ChangeEvent<HTMLInputElement>) {
-    if (e.target.files?.[0]) handleBannerFile(e.target.files[0]);
+    if (e.target.files?.[0]) void handleBannerFile(e.target.files[0]);
     if (bannerInputRef.current) bannerInputRef.current.value = '';
   }
 
   function onAvatarInput(e: ChangeEvent<HTMLInputElement>) {
-    if (e.target.files?.[0]) handleAvatarFile(e.target.files[0]);
+    if (e.target.files?.[0]) void handleAvatarFile(e.target.files[0]);
     if (avatarInputRef.current) avatarInputRef.current.value = '';
   }
 
   function onBannerDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault(); setDragOverBanner(false);
-    if (e.dataTransfer.files?.[0]) handleBannerFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files?.[0]) void handleBannerFile(e.dataTransfer.files[0]);
   }
 
   function onAvatarDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault(); setDragOverAvatar(false);
-    if (e.dataTransfer.files?.[0]) handleAvatarFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files?.[0]) void handleAvatarFile(e.dataTransfer.files[0]);
   }
 
   // Checar loja
@@ -733,22 +754,34 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   <input ref={bannerInputRef} type="file" accept="image/*"
                     className="hidden" onChange={onBannerInput} />
                   <div
-                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5
-                      py-5 cursor-pointer transition-all"
+                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 py-5 transition-all"
                     style={{
-                      borderColor: dragOverBanner ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
-                      background: dragOverBanner ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                      borderColor: convertingBanner ? customizacao.neonColor : dragOverBanner ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
+                      background: convertingBanner ? customizacao.neonColor + '08' : dragOverBanner ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                      cursor: convertingBanner ? 'not-allowed' : 'pointer',
+                      pointerEvents: convertingBanner ? 'none' : 'auto',
                     }}
                     onClick={() => bannerInputRef.current?.click()}
                     onDragOver={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragOverBanner(true); }}
                     onDragLeave={() => setDragOverBanner(false)}
                     onDrop={onBannerDrop}>
-                    <span className="text-xl">🖼</span>
-                    <span className="text-xs text-white/30 tracking-widest"
-                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                      Arraste ou clique para enviar
-                    </span>
-                    <span className="text-[10px] text-white/20">PNG, JPG, WEBP — máx. 5MB</span>
+                    {convertingBanner ? (
+                      <>
+                        <span className="text-xl spinner" style={{ display: 'inline-block', color: customizacao.neonColor }}>⟳</span>
+                        <span className="text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                          Carregando banner...
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xl">🖼</span>
+                        <span className="text-xs text-white/30 tracking-widest"
+                          style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          Arraste ou clique para enviar
+                        </span>
+                        <span className="text-[10px] text-white/20">PNG, JPG, WEBP — máx. 5MB</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -814,22 +847,34 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   <input ref={avatarInputRef} type="file" accept="image/*"
                     className="hidden" onChange={onAvatarInput} />
                   <div
-                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5
-                      py-5 cursor-pointer transition-all"
+                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 py-5 transition-all"
                     style={{
-                      borderColor: dragOverAvatar ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
-                      background: dragOverAvatar ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                      borderColor: convertingAvatar ? customizacao.neonColor : dragOverAvatar ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
+                      background: convertingAvatar ? customizacao.neonColor + '08' : dragOverAvatar ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                      cursor: convertingAvatar ? 'not-allowed' : 'pointer',
+                      pointerEvents: convertingAvatar ? 'none' : 'auto',
                     }}
                     onClick={() => avatarInputRef.current?.click()}
                     onDragOver={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragOverAvatar(true); }}
                     onDragLeave={() => setDragOverAvatar(false)}
                     onDrop={onAvatarDrop}>
-                    <span className="text-xl">👤</span>
-                    <span className="text-xs text-white/30 tracking-widest"
-                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                      Arraste ou clique para enviar
-                    </span>
-                    <span className="text-[10px] text-white/20">PNG, JPG, WEBP — recomendado 1:1</span>
+                    {convertingAvatar ? (
+                      <>
+                        <span className="text-xl spinner" style={{ display: 'inline-block', color: customizacao.neonColor }}>⟳</span>
+                        <span className="text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                          Carregando logo...
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xl">👤</span>
+                        <span className="text-xs text-white/30 tracking-widest"
+                          style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          Arraste ou clique para enviar
+                        </span>
+                        <span className="text-[10px] text-white/20">PNG, JPG, WEBP — recomendado 1:1</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
