@@ -11,7 +11,7 @@ import {
 } from './stablecoins';
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
-import { getStoreRegistry, getBoostedProducts, getNeonShadow, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
+import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -258,6 +258,37 @@ export default function HomePage() {
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
+  // Quando o usuário conecta, carrega a loja dele na blockchain e registra
+  useEffect(() => {
+    if (!walletAddress) return;
+    const addr = walletAddress.toLowerCase();
+    async function carregarLojaConectado() {
+      try {
+        const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+        const s = await contrato.stores(addr);
+        if (!s?.storeName) return;
+        let customizacao = { avatarUrl: '', bannerUrl: '', neonColor: '#00e5ff' };
+        try {
+          const raw = localStorage.getItem(`archermes_customizacao_${addr}`);
+          if (raw) customizacao = JSON.parse(raw);
+        } catch { /* ignore */ }
+        const entry: RegistryStore = {
+          address: addr,
+          storeName: s.storeName,
+          avatarUrl: customizacao.avatarUrl,
+          bannerUrl: customizacao.bannerUrl,
+          neonColor: customizacao.neonColor,
+          tier: Number(s.tier),
+          productCount: Number(s.productCount),
+        };
+        saveStoreToRegistry(entry);
+        setLojasReais(getStoreRegistry());
+      } catch { /* ignore */ }
+    }
+    void carregarLojaConectado();
+  }, [walletAddress]);
+
   // Vitrine
   const [vitrine, setVitrine] = useState<ItemBlockchain[]>([]);
   const [lojasVip, setLojasVip] = useState<LojaVip[]>([]);
@@ -370,16 +401,37 @@ export default function HomePage() {
         );
         const proSet = new Set<string>();
         const vipList: LojaVip[] = [];
+        const registryEntries: RegistryStore[] = [];
         storeResults.forEach((s, idx) => {
-          if (!s) return;
+          if (!s || !s.storeName) return;
+          const addr = uniqueSellers[idx];
           const tier = Number(s.tier);
-          if (tier === 1 && s.storeName) {
-            proSet.add(uniqueSellers[idx].toLowerCase());
-            vipList.push({ address: uniqueSellers[idx], storeName: s.storeName, productCount: Number(s.productCount), tier });
+          if (tier === 1) {
+            proSet.add(addr.toLowerCase());
+            vipList.push({ address: addr, storeName: s.storeName, productCount: Number(s.productCount), tier });
           }
+          let customizacao = { avatarUrl: '', bannerUrl: '', neonColor: '#00e5ff' };
+          try {
+            const raw = localStorage.getItem(`archermes_customizacao_${addr}`);
+            if (raw) customizacao = JSON.parse(raw);
+          } catch { /* ignore */ }
+          const entry: RegistryStore = {
+            address: addr,
+            storeName: s.storeName,
+            avatarUrl: customizacao.avatarUrl,
+            bannerUrl: customizacao.bannerUrl,
+            neonColor: customizacao.neonColor,
+            tier,
+            productCount: Number(s.productCount),
+          };
+          registryEntries.push(entry);
+          saveStoreToRegistry(entry);
         });
         setSellersPro(proSet);
         setLojasVip(vipList);
+        if (registryEntries.length > 0) {
+          setLojasReais(getStoreRegistry());
+        }
       }
     } catch (err) {
       console.error('Erro ao carregar vitrine:', err);
