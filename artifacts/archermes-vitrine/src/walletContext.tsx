@@ -3,6 +3,7 @@ import {
   type ReactNode,
 } from 'react';
 import { BrowserProvider } from 'ethers';
+import { usePrivy } from '@privy-io/react-auth';
 import { arcTestnet } from './chains';
 
 interface WalletCtx {
@@ -35,6 +36,8 @@ function getEth() {
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
+  const { logout: privyLogout } = usePrivy();
+
   const [address, setAddress] = useState<string>(() => {
     try { return localStorage.getItem(LS_ADDR) ?? ''; } catch { return ''; }
   });
@@ -143,10 +146,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [switchToArc]);
 
   const disconnect = useCallback(() => {
+    // 1. Reset app state immediately
     setAddress('');
     setProvider(null);
     try { localStorage.removeItem(LS_ADDR); } catch { /* ignore */ }
-  }, []);
+
+    // 2. Revoke wallet permissions (EIP-2255) so the next connect() prompts
+    //    fresh account selection instead of auto-reconnecting the same address.
+    const eth = getEth();
+    if (eth) {
+      eth.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] })
+        .catch(() => { /* wallet may not support EIP-2255 — safe to ignore */ });
+    }
+
+    // 3. Clear the Privy session so the auth modal starts fresh on next login.
+    privyLogout().catch(() => { /* ignore Privy errors */ });
+  }, [privyLogout]);
 
   const getProvider = useCallback((): BrowserProvider | null => {
     const eth = getEth();
