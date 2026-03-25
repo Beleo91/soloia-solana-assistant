@@ -1,8 +1,27 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// Prevents Vite from crashing when the Replit proxy sends RSV1-flagged
+// (permessage-deflate compressed) WebSocket frames that the ws library
+// rejects with WS_ERR_UNEXPECTED_RSV_1.
+const wsErrorHandlerPlugin = (): Plugin => ({
+  name: 'ws-error-handler',
+  configureServer(server) {
+    server.httpServer?.once('listening', () => {
+      const wss = (server.ws as unknown as { wss?: import('ws').WebSocketServer }).wss;
+      if (wss) {
+        wss.on('connection', (ws) => {
+          if (!ws.listenerCount('error')) {
+            ws.on('error', () => {});
+          }
+        });
+      }
+    });
+  },
+});
 
 const rawPort = process.env.PORT;
 
@@ -32,6 +51,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
+    wsErrorHandlerPlugin(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
