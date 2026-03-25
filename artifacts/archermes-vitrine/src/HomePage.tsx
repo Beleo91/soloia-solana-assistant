@@ -40,6 +40,132 @@ const MOCK_ITEM_IMAGES: Record<number, string[]> = {
   ],
 };
 
+interface LojaParceiraMock {
+  id: string;
+  nome: string;
+  cor: string;
+  corSombra: string;
+  logo: string;
+  produtos: string[];
+}
+
+interface ProdutoImpulsionado {
+  id: number;
+  itemName: string;
+  priceEth: string;
+  category: string;
+  currency: Moeda;
+  image: string;
+  destaque: 'ouro' | 'roxo';
+}
+
+const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
+  {
+    id: 'nike-drop',
+    nome: 'Nike Drop Zone',
+    cor: '#00e5ff',
+    corSombra: 'rgba(0,229,255,0.4)',
+    logo: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop&crop=center',
+    produtos: [
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1579338559194-a162d19bf842?w=120&h=120&fit=crop',
+    ],
+  },
+  {
+    id: 'techvault',
+    nome: 'TechVault',
+    cor: '#c084fc',
+    corSombra: 'rgba(192,132,252,0.4)',
+    logo: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=80&h=80&fit=crop&crop=center',
+    produtos: [
+      'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1526406915894-7bcd65f60845?w=120&h=120&fit=crop',
+    ],
+  },
+  {
+    id: 'neonfit',
+    nome: 'NeonFit',
+    cor: '#4ade80',
+    corSombra: 'rgba(74,222,128,0.4)',
+    logo: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=80&h=80&fit=crop&crop=center',
+    produtos: [
+      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1576678927484-cc907957088c?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=120&h=120&fit=crop',
+    ],
+  },
+  {
+    id: 'galaxy-games',
+    nome: 'Galaxy Games',
+    cor: '#fb923c',
+    corSombra: 'rgba(251,146,60,0.4)',
+    logo: 'https://images.unsplash.com/photo-1486572788966-cfd3df1f5b42?w=80&h=80&fit=crop&crop=center',
+    produtos: [
+      'https://images.unsplash.com/photo-1486572788966-cfd3df1f5b42?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1493711662062-fa541adb3fc8?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1563396983906-b3795482a59a?w=120&h=120&fit=crop',
+    ],
+  },
+  {
+    id: 'cyber-beauty',
+    nome: 'Cyber Beauty',
+    cor: '#f472b6',
+    corSombra: 'rgba(244,114,182,0.4)',
+    logo: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=80&h=80&fit=crop&crop=center',
+    produtos: [
+      'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=120&h=120&fit=crop',
+      'https://images.unsplash.com/photo-1570194065650-d99fb4bedf0a?w=120&h=120&fit=crop',
+    ],
+  },
+];
+
+const MOCK_IMPULSIONADOS: ProdutoImpulsionado[] = [
+  {
+    id: 201,
+    itemName: 'Air Boost X Pro',
+    priceEth: '0.08',
+    category: 'Moda',
+    currency: 'USDC',
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=260&fit=crop',
+    destaque: 'ouro',
+  },
+  {
+    id: 202,
+    itemName: 'HyperPod XS Elite',
+    priceEth: '0.12',
+    category: 'Eletrônicos',
+    currency: 'ETH',
+    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=260&fit=crop',
+    destaque: 'roxo',
+  },
+  {
+    id: 203,
+    itemName: 'Cyber Perfume N°7',
+    priceEth: '45.00',
+    category: 'Perfumes e Beleza',
+    currency: 'EURC',
+    image: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=400&h=260&fit=crop',
+    destaque: 'ouro',
+  },
+  {
+    id: 204,
+    itemName: 'Neo Jacket Stealth',
+    priceEth: '0.15',
+    category: 'Moda',
+    currency: 'ETH',
+    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=260&fit=crop',
+    destaque: 'roxo',
+  },
+];
+
 interface LojaVip {
   address: string;
   storeName: string;
@@ -406,6 +532,125 @@ export default function HomePage() {
           <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
         </section>
       )}
+
+      {/* ── LOJAS PARCEIRAS ── */}
+      <section className="vitrine-container" style={{ paddingTop: '2.5rem', paddingBottom: '0' }}>
+        <div className="flex items-center gap-3 mb-6">
+          <span style={{ fontSize: '1.1rem', filter: 'drop-shadow(0 0 8px #00e5ff)' }}>⬡</span>
+          <div>
+            <h2 className="text-xl font-black tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
+                textShadow: '0 0 20px rgba(0,229,255,0.5)' }}>
+              Lojas Parceiras
+            </h2>
+            <p className="text-white/30 text-xs tracking-wide mt-0.5">
+              Marketplaces verificadas na Arc Testnet
+            </p>
+          </div>
+        </div>
+        <div className="parceiras-scroll">
+          {MOCK_LOJAS_PARCEIRAS.map((loja) => (
+            <div key={loja.id} className="parceira-card">
+              <div className="parceira-logo-wrap" style={{
+                borderColor: loja.cor,
+                boxShadow: `0 0 16px ${loja.corSombra}, inset 0 0 12px ${loja.corSombra.replace('0.4', '0.08')}`,
+              }}>
+                <img src={loja.logo} alt={loja.nome} className="parceira-logo-img" loading="lazy" />
+              </div>
+              <span className="parceira-nome" style={{ color: loja.cor,
+                textShadow: `0 0 8px ${loja.corSombra}` }}>
+                {loja.nome}
+              </span>
+              <div className="parceira-mini-grid">
+                {loja.produtos.map((img, i) => (
+                  <img key={i} src={img} alt="" className="parceira-thumb" loading="lazy" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-8" />
+      </section>
+
+      {/* ── PRODUTOS IMPULSIONADOS ── */}
+      <section className="vitrine-container" style={{ paddingTop: '2.5rem', paddingBottom: '0' }}>
+        <div className="flex items-center gap-3 mb-6">
+          <span style={{ fontSize: '1.1rem', filter: 'drop-shadow(0 0 8px #fbbf24)' }}>⚡</span>
+          <div>
+            <h2 className="text-xl font-black tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24',
+                textShadow: '0 0 20px rgba(251,191,36,0.5)' }}>
+              Produtos Impulsionados
+            </h2>
+            <p className="text-white/30 text-xs tracking-wide mt-0.5">
+              Destaques selecionados nesta semana
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          {MOCK_IMPULSIONADOS.map((item) => {
+            const isOuro = item.destaque === 'ouro';
+            const corBorda = isOuro ? '#fbbf24' : '#c084fc';
+            const corSombra = isOuro ? 'rgba(251,191,36,0.35)' : 'rgba(192,132,252,0.35)';
+            const fundoCard = isOuro
+              ? 'linear-gradient(145deg,rgba(251,191,36,0.10),rgba(10,13,26,0.96))'
+              : 'linear-gradient(145deg,rgba(124,58,237,0.14),rgba(10,13,26,0.96))';
+            const curMeta = item.currency !== 'ETH' ? STABLECOIN_META[item.currency as StablecoinSymbol] : null;
+            const priceDisplay = curMeta
+              ? formatStablecoinPrice(item.priceEth, item.currency as StablecoinSymbol)
+              : parseFloat(item.priceEth).toFixed(4);
+            return (
+              <div key={item.id} className="card-impulsionado"
+                style={{ background: fundoCard, borderColor: corBorda,
+                  boxShadow: `0 0 20px ${corSombra}, 0 0 1px ${corBorda}` }}>
+                <span className="badge-impulsionado"
+                  style={{ color: corBorda, borderColor: corBorda + '55',
+                    background: corBorda + '18',
+                    boxShadow: `0 0 8px ${corSombra}` }}>
+                  ⚡ IMPULSIONADO
+                </span>
+                <div className="impulsionado-img-wrap">
+                  <img src={item.image} alt={item.itemName} className="impulsionado-img" loading="lazy" />
+                </div>
+                <div className="flex flex-col gap-2 mt-1">
+                  <span className="text-[9px] text-white/30 tracking-widest uppercase"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    {item.category}
+                  </span>
+                  <h3 className="font-black text-sm text-white leading-tight"
+                    style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.04em' }}>
+                    {item.itemName}
+                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-black text-base"
+                      style={{ fontFamily: "'Orbitron', sans-serif", color: corBorda,
+                        textShadow: `0 0 10px ${corSombra}` }}>
+                      {priceDisplay}
+                      {item.currency === 'ETH' && (
+                        <span className="text-xs text-white/30 ml-1 font-normal">ETH</span>
+                      )}
+                    </span>
+                    {curMeta && (
+                      <span className="currency-badge" style={{
+                        color: curMeta.cor, background: curMeta.corFundo, borderColor: curMeta.cor + '55',
+                      }}>
+                        {item.currency}
+                      </span>
+                    )}
+                  </div>
+                  <button className="btn-neon btn-neon-full btn-neon-sm mt-1"
+                    style={{ borderColor: corBorda + '55', color: corBorda,
+                      background: corBorda + '12' }}
+                    onClick={() => login()}>
+                    🔒 Entrar para comprar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      </section>
 
       {/* ── VITRINE ── */}
       <section className="vitrine-container">

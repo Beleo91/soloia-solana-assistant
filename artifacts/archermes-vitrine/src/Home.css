@@ -394,6 +394,139 @@ body::after {
 .scroll-oculto { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* ════════════════════════════════════════════════
+   LOJAS PARCEIRAS — horizontal carousel
+   ════════════════════════════════════════════════ */
+.parceiras-scroll {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+.parceiras-scroll::-webkit-scrollbar { display: none; }
+
+.parceira-card {
+  flex: 0 0 auto;
+  width: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  scroll-snap-align: start;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1.1rem;
+  padding: 1rem 0.75rem 0.85rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.parceira-card:hover {
+  transform: translateY(-4px);
+}
+
+.parceira-logo-wrap {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 2px solid;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.parceira-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.parceira-nome {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.parceira-mini-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: 100%;
+  border-radius: 0.45rem;
+  overflow: hidden;
+}
+.parceira-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+/* ════════════════════════════════════════════════
+   PRODUTOS IMPULSIONADOS — premium cards
+   ════════════════════════════════════════════════ */
+.card-impulsionado {
+  border-radius: 1.1rem;
+  border: 1px solid;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  backdrop-filter: blur(16px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  animation: glow-pulse 3.5s ease-in-out infinite;
+}
+.card-impulsionado:hover {
+  transform: translateY(-6px) scale(1.015);
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: inherit; }
+  50% { filter: brightness(1.06); }
+}
+
+.badge-impulsionado {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 2;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.55rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  border: 1px solid;
+  white-space: nowrap;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.impulsionado-img-wrap {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+.impulsionado-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.4s ease;
+}
+.card-impulsionado:hover .impulsionado-img {
+  transform: scale(1.06);
+}
+
+.card-impulsionado > div:last-child {
+  padding: 0.9rem 1rem 1.1rem;
+}
+
+/* ════════════════════════════════════════════════
    NEON BUTTON SYSTEM
    Usage: class="btn-neon btn-neon-cyan"
    Modifiers: btn-neon-sm | btn-neon-lg | btn-neon-full

@@ -34,6 +34,7 @@ const NEON_OPTIONS = [
 ];
 
 const LS_KEY = 'archermes_customizacao';
+const LS_DELETED_KEY = 'archermes_deleted_items';
 
 type DashEstado = 'idle' | 'criando' | 'sucesso' | 'erro';
 
@@ -51,6 +52,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const [proFee, setProFee] = useState('0.05');
 
   const [meusProdutos, setMeusProdutos] = useState<MeuProduto[]>([]);
+  const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
   const [carregandoProdutos, setCarregandoProdutos] = useState(false);
 
   const [abaAtiva, setAbaAtiva] = useState<'loja' | 'produtos' | 'visual'>('loja');
@@ -68,6 +70,15 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
     try {
       const saved = localStorage.getItem(`${LS_KEY}_${enderecoUsuario}`);
       if (saved) setCustomizacao(JSON.parse(saved));
+    } catch { /* ignore */ }
+  }, [enderecoUsuario]);
+
+  // Carregar IDs excluídos do localStorage
+  useEffect(() => {
+    if (!enderecoUsuario) return;
+    try {
+      const saved = localStorage.getItem(`${LS_DELETED_KEY}_${enderecoUsuario}`);
+      if (saved) setDeletedIds(new Set(JSON.parse(saved) as number[]));
     } catch { /* ignore */ }
   }, [enderecoUsuario]);
 
@@ -119,7 +130,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           });
         }
       }
-      setMeusProdutos(lista);
+      setMeusProdutos(lista.filter((p) => !deletedIds.has(p.id)));
     } catch (err) { console.error(err); } finally { setCarregandoProdutos(false); }
   };
 
@@ -170,7 +181,13 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   function handleExcluirItem(id: number) {
     const confirmado = window.confirm('Tem certeza que deseja excluir este anúncio permanentemente?');
     if (confirmado) {
+      const next = new Set(deletedIds);
+      next.add(id);
+      setDeletedIds(next);
       setMeusProdutos((prev) => prev.filter((p) => p.id !== id));
+      try {
+        localStorage.setItem(`${LS_DELETED_KEY}_${enderecoUsuario}`, JSON.stringify([...next]));
+      } catch { /* ignore */ }
     }
   }
 
