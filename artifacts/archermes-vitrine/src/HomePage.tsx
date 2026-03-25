@@ -254,27 +254,45 @@ export default function HomePage() {
 
   // Upload de imagens no modal
   const [formImages, setFormImages] = useState<File[]>([]);
+  const [formImagesBase64, setFormImagesBase64] = useState<string[]>([]);
+  const [convertingImages, setConvertingImages] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function mergeFiles(existing: File[], incoming: FileList | null): File[] {
-    if (!incoming) return existing;
-    const next = [...existing];
-    Array.from(incoming).forEach((f) => {
-      if (!next.find((e) => e.name === f.name && e.size === f.size)) next.push(f);
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-    return next;
+  }
+
+  async function addFiles(incoming: FileList | null) {
+    if (!incoming) return;
+    const newFiles = Array.from(incoming).filter(
+      (f) => !formImages.find((e) => e.name === f.name && e.size === f.size)
+    );
+    if (newFiles.length === 0) return;
+    setConvertingImages(true);
+    try {
+      const base64s = await Promise.all(newFiles.map(fileToBase64));
+      setFormImages((prev) => [...prev, ...newFiles]);
+      setFormImagesBase64((prev) => [...prev, ...base64s]);
+    } finally {
+      setConvertingImages(false);
+    }
   }
 
   function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
-    setFormImages((prev) => mergeFiles(prev, e.target.files));
+    void addFiles(e.target.files);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragOver(false);
-    setFormImages((prev) => mergeFiles(prev, e.dataTransfer.files));
+    void addFiles(e.dataTransfer.files);
   }
 
   function handleDragOver(e: DragEvent<HTMLDivElement>) {
@@ -284,6 +302,7 @@ export default function HomePage() {
 
   function handleRemoveFormImage(idx: number) {
     setFormImages((prev) => prev.filter((_, i) => i !== idx));
+    setFormImagesBase64((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function setCardImage(itemId: number, idx: number) {
@@ -309,13 +328,18 @@ export default function HomePage() {
         const item = await contrato.items(i);
         if (!item.isSold && item.isActive) {
           const id = Number(item.id);
+          let images: string[] | undefined = MOCK_ITEM_IMAGES[id];
+          try {
+            const saved = localStorage.getItem(`archermes_item_images_${id}`);
+            if (saved) images = JSON.parse(saved) as string[];
+          } catch { /* ignore */ }
           itens.push({
             id,
             itemName: item.itemName,
             priceEth: formatUnits(item.price, 18),
             category: item.category,
             seller: item.seller,
-            images: MOCK_ITEM_IMAGES[id],
+            images,
             currency: MOCK_ITEM_CURRENCY[id] ?? 'ETH',
           });
         }
@@ -353,10 +377,10 @@ export default function HomePage() {
   function abrirModal() {
     setEstado('idle'); setTxHash(''); setErroMsg('');
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
-    setFormImages([]);
+    setFormImages([]); setFormImagesBase64([]);
     setModalAberto(true);
   }
-  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); }
+  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -376,6 +400,14 @@ export default function HomePage() {
       const precoWei = parseUnits(form.preco, 18);
       const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria);
       await tx.wait();
+      // Salvar imagens no localStorage keyed pelo novo ID do item
+      if (formImagesBase64.length > 0) {
+        try {
+          const newTotal: bigint = await contrato.totalItems();
+          const newId = Number(newTotal);
+          localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(formImagesBase64));
+        } catch { /* ignore */ }
+      }
       setTxHash(tx.hash);
       setEstado('sucesso');
       carregarVitrine();
@@ -936,21 +968,34 @@ export default function HomePage() {
                       onChange={handleFilesSelected}
                     />
                     <div
-                      className={`upload-dropzone${dragOver ? ' upload-dropzone-active' : ''}`}
-                      onClick={() => fileInputRef.current?.click()}
+                      className={`upload-dropzone${dragOver ? ' upload-dropzone-active' : ''}${convertingImages ? ' upload-dropzone-loading' : ''}`}
+                      onClick={() => !convertingImages && fileInputRef.current?.click()}
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onDragLeave={() => setDragOver(false)}
                     >
-                      <span className="upload-dropzone-icon">📷</span>
-                      <span className="upload-dropzone-text">Clique ou arraste as imagens do produto aqui</span>
-                      <span className="upload-dropzone-sub">PNG, JPG, WEBP · múltiplos arquivos aceitos</span>
+                      {convertingImages ? (
+                        <>
+                          <span className="upload-dropzone-icon spinner" style={{ display: 'inline-block' }}>⟳</span>
+                          <span className="upload-dropzone-text" style={{ color: '#00e5ff' }}>Carregando imagens...</span>
+                          <span className="upload-dropzone-sub">Convertendo arquivos, aguarde</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="upload-dropzone-icon">📷</span>
+                          <span className="upload-dropzone-text">Clique ou arraste as imagens do produto aqui</span>
+                          <span className="upload-dropzone-sub">PNG, JPG, WEBP · múltiplos arquivos aceitos</span>
+                        </>
+                      )}
                     </div>
                     {formImages.length > 0 && (
                       <div className="upload-thumb-list">
                         {formImages.map((file, idx) => (
                           <div key={idx} className="upload-thumb">
                             <img src={URL.createObjectURL(file)} alt={file.name} loading="lazy" />
+                            {formImagesBase64[idx] && (
+                              <span className="upload-thumb-saved" title="Imagem salva">✓</span>
+                            )}
                             <button
                               type="button"
                               className="upload-thumb-remove"

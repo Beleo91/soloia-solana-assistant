@@ -802,6 +802,12 @@ body::after {
   background: rgba(0, 229, 255, 0.06);
   box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
 }
+.upload-dropzone-loading {
+  border-color: rgba(0, 229, 255, 0.5);
+  background: rgba(0, 229, 255, 0.04);
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .upload-dropzone-icon {
   font-size: 1.75rem;
   color: #00e5ff;
@@ -868,6 +874,23 @@ body::after {
 .upload-thumb-remove:hover {
   background: #b91c1c;
   transform: scale(1.15);
+}
+.upload-thumb-saved {
+  position: absolute;
+  bottom: -0.3rem;
+  left: -0.3rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 1.5px solid #0c1022;
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 
 /* ─── PRODUCT CARD IMAGE GALLERY ─── */
