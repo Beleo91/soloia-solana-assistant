@@ -132,7 +132,7 @@ body::after {
 /* ─── CATEGORIES ─── */
 .area-nichos {
   padding: 2.5rem 2.5rem 4rem;
-  max-width: 1200px;
+  max-width: 72rem;
   margin: 0 auto;
 }
 .area-nichos h2 {
@@ -574,7 +574,19 @@ body::after {
 
 /* ─── FIX CATEGORIES WIDTH ─── */
 .area-nichos {
-  max-width: 1280px;
+  max-width: 72rem;
 }
 .area-nichos h2 { text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* ─── VITRINE CENTERED CONTAINER ─── */
+.vitrine-container {
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+  width: 100%;
+}
 

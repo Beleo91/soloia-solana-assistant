@@ -292,7 +292,7 @@ export default function HomePage() {
 
       {/* ── LOJAS VIP ── */}
       {lojasVip.length > 0 && (
-        <section className="px-6 pt-8 pb-2 max-w-7xl mx-auto w-full">
+        <section className="vitrine-container" style={{ paddingTop: '2rem', paddingBottom: '0.5rem' }}>
           <div className="flex items-center gap-3 mb-5">
             <span className="text-lg" style={{ filter: 'drop-shadow(0 0 8px #fbbf24)' }}>⚡</span>
             <h2 className="text-base font-black tracking-widest uppercase"
@@ -326,7 +326,7 @@ export default function HomePage() {
       )}
 
       {/* ── VITRINE ── */}
-      <section className="px-6 py-8 max-w-7xl mx-auto w-full">
+      <section className="vitrine-container">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-black tracking-widest uppercase"
