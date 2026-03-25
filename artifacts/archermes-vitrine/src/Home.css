@@ -593,6 +593,96 @@ body::after {
 }
 .area-nichos h2 { text-transform: uppercase; letter-spacing: 0.08em; }
 
+/* ─── UPLOAD DROPZONE ─── */
+.upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1.5px dashed rgba(0, 229, 255, 0.3);
+  border-radius: 0.75rem;
+  padding: 1.5rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  background: rgba(0, 229, 255, 0.02);
+  text-align: center;
+  user-select: none;
+}
+.upload-dropzone:hover,
+.upload-dropzone-active {
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.06);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.12);
+}
+.upload-dropzone-icon {
+  font-size: 1.75rem;
+  color: #00e5ff;
+  opacity: 0.55;
+  line-height: 1;
+}
+.upload-dropzone-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(0, 229, 255, 0.55);
+  text-transform: uppercase;
+}
+.upload-dropzone-sub {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.03em;
+}
+
+/* ─── UPLOAD THUMBNAIL STRIP ─── */
+.upload-thumb-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.upload-thumb {
+  position: relative;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.4rem;
+  overflow: visible;
+  flex-shrink: 0;
+}
+.upload-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  display: block;
+}
+.upload-thumb-remove {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #dc2626;
+  border: 1.5px solid #0c1022;
+  color: #fff;
+  font-size: 0.55rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.15s, transform 0.15s;
+  z-index: 2;
+}
+.upload-thumb-remove:hover {
+  background: #b91c1c;
+  transform: scale(1.15);
+}
+
 /* ─── PRODUCT CARD IMAGE GALLERY ─── */
 .card-gallery {
   display: flex;

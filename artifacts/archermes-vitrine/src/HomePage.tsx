@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
 import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { arcTestnet } from './chains';
@@ -107,6 +107,40 @@ export default function HomePage() {
 
   const [selectedImages, setSelectedImages] = useState<Record<number, number>>({});
 
+  // Upload de imagens no modal
+  const [formImages, setFormImages] = useState<File[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function mergeFiles(existing: File[], incoming: FileList | null): File[] {
+    if (!incoming) return existing;
+    const next = [...existing];
+    Array.from(incoming).forEach((f) => {
+      if (!next.find((e) => e.name === f.name && e.size === f.size)) next.push(f);
+    });
+    return next;
+  }
+
+  function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
+    setFormImages((prev) => mergeFiles(prev, e.target.files));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    setFormImages((prev) => mergeFiles(prev, e.dataTransfer.files));
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function handleRemoveFormImage(idx: number) {
+    setFormImages((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   function setCardImage(itemId: number, idx: number) {
     setSelectedImages((prev) => ({ ...prev, [itemId]: idx }));
   }
@@ -173,9 +207,10 @@ export default function HomePage() {
   function abrirModal() {
     setEstado('idle'); setTxHash(''); setErroMsg('');
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
+    setFormImages([]);
     setModalAberto(true);
   }
-  function fecharModal() { setModalAberto(false); setEstado('idle'); }
+  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -574,6 +609,45 @@ export default function HomePage() {
                       {CATEGORIAS.map((c) => <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>)}
                     </select>
                   </div>
+                  {/* Upload de imagens */}
+                  <div className="campo">
+                    <label>Imagens do Produto</label>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      style={{ display: 'none' }}
+                      onChange={handleFilesSelected}
+                    />
+                    <div
+                      className={`upload-dropzone${dragOver ? ' upload-dropzone-active' : ''}`}
+                      onClick={() => fileInputRef.current?.click()}
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={() => setDragOver(false)}
+                    >
+                      <span className="upload-dropzone-icon">📷</span>
+                      <span className="upload-dropzone-text">Clique ou arraste as imagens do produto aqui</span>
+                      <span className="upload-dropzone-sub">PNG, JPG, WEBP · múltiplos arquivos aceitos</span>
+                    </div>
+                    {formImages.length > 0 && (
+                      <div className="upload-thumb-list">
+                        {formImages.map((file, idx) => (
+                          <div key={idx} className="upload-thumb">
+                            <img src={URL.createObjectURL(file)} alt={file.name} loading="lazy" />
+                            <button
+                              type="button"
+                              className="upload-thumb-remove"
+                              onClick={() => handleRemoveFormImage(idx)}
+                              aria-label="Remover imagem"
+                            >✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {estado === 'erro' && <div className="modal-erro">⚠️ {erroMsg}</div>}
                   <button type="submit" className="btn-publicar">🚀 Publicar no Marketplace</button>
                 </form>
