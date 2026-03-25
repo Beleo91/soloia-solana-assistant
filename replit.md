@@ -94,3 +94,31 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+### `artifacts/archermes-vitrine` (`@workspace/archermes-vitrine`)
+
+Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript + Tailwind CSS v4.
+
+**Chain**: Arc Testnet (chainId 5042002), RPC: `https://rpc.testnet.arc.network`, Explorer: `https://testnet.arcscan.app`
+**Contract**: `0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9`
+**Auth**: Privy (`@privy-io/react-auth`)
+**Key files**:
+- `src/HomePage.tsx` — vitrine principal (Lojas Parceiras carousel, Produtos Impulsionados, product grid)
+- `src/StoreDashboard.tsx` — painel do lojista (tabs: loja, produtos, visual)
+- `src/Home.css` — layout-critical CSS (cyberpunk card classes, parceira-card, neon glows, glow-pulse)
+- `src/contract.ts` — ABI + CONTRACT_ADDRESS
+- `src/chains.ts` — arcTestnet chain config
+- `src/stablecoins.ts` — USDC/EURC ERC-20 helpers (approveERC20, transferERC20)
+
+**Features**:
+- On-chain product listing via smart contract (createItem / buyItem)
+- ERC-20 stablecoin support (USDC/EURC): approve → transfer flow
+- Persistent deletion per wallet address (localStorage `archermes_deleted_items_<addr>`)
+- Lojas Parceiras: horizontal-scroll carousel, banner + overlapping round logo + 2×2 mini product grid
+- Produtos Impulsionados: 4 premium cards with gold/purple neon borders, glow-pulse animation
+- StoreDashboard visual panel: preset banner gallery (4), preset avatar gallery (4), file upload dropzones with drag-and-drop, neon color picker
+
+**Notes**:
+- `STABLECOIN_ADDRESSES` are placeholders (0x000...001 / 0x000...002) until real contracts deploy
+- "Invalid hook call" in console is pre-existing Privy/Coinbase connector issue, not a bug
+- Tailwind v4: layout-critical styles use custom CSS classes in `Home.css`

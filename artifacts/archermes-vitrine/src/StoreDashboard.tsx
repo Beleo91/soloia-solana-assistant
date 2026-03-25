@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from 'ethers';
 import { arcTestnet } from './chains';
@@ -36,6 +36,20 @@ const NEON_OPTIONS = [
 const LS_KEY = 'archermes_customizacao';
 const LS_DELETED_KEY = 'archermes_deleted_items';
 
+const PRESET_BANNERS = [
+  { id: 'b1', url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&h=160&fit=crop', label: 'Circuit' },
+  { id: 'b2', url: 'https://images.unsplash.com/photo-1614680376739-414d95ff43df?w=600&h=160&fit=crop', label: 'Neon Haze' },
+  { id: 'b3', url: 'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=600&h=160&fit=crop', label: 'Data Grid' },
+  { id: 'b4', url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=160&fit=crop', label: 'Retro Cyber' },
+];
+
+const PRESET_AVATARS = [
+  { id: 'a1', url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=120&h=120&fit=crop', label: 'Robô' },
+  { id: 'a2', url: 'https://images.unsplash.com/photo-1531746790731-6c087fecd65a?w=120&h=120&fit=crop', label: 'Cyber' },
+  { id: 'a3', url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=120&h=120&fit=crop', label: 'A.I.' },
+  { id: 'a4', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop', label: 'Matrix' },
+];
+
 type DashEstado = 'idle' | 'criando' | 'sucesso' | 'erro';
 
 export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
@@ -63,6 +77,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const [rastreioCode, setRastreioCode] = useState('');
   const [txStatus, setTxStatus] = useState<Record<number, string>>({});
 
+  const [dragOverBanner, setDragOverBanner] = useState(false);
+  const [dragOverAvatar, setDragOverAvatar] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
   const enderecoUsuario = wallets[0]?.address ?? '';
 
   // Carregar customização do localStorage
@@ -85,6 +104,36 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   function salvarCustomizacao(next: Customizacao) {
     setCustomizacao(next);
     try { localStorage.setItem(`${LS_KEY}_${enderecoUsuario}`, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  function handleBannerFile(file: File) {
+    const url = URL.createObjectURL(file);
+    salvarCustomizacao({ ...customizacao, bannerUrl: url });
+  }
+
+  function handleAvatarFile(file: File) {
+    const url = URL.createObjectURL(file);
+    salvarCustomizacao({ ...customizacao, avatarUrl: url });
+  }
+
+  function onBannerInput(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files?.[0]) handleBannerFile(e.target.files[0]);
+    if (bannerInputRef.current) bannerInputRef.current.value = '';
+  }
+
+  function onAvatarInput(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files?.[0]) handleAvatarFile(e.target.files[0]);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  }
+
+  function onBannerDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault(); setDragOverBanner(false);
+    if (e.dataTransfer.files?.[0]) handleBannerFile(e.dataTransfer.files[0]);
+  }
+
+  function onAvatarDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault(); setDragOverAvatar(false);
+    if (e.dataTransfer.files?.[0]) handleAvatarFile(e.dataTransfer.files[0]);
   }
 
   // Checar loja
@@ -620,88 +669,199 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           {/* ABA: VISUAL */}
           {abaAtiva === 'visual' && (
             <div className="flex flex-col gap-6">
-              <div className="rounded-2xl border border-white/10 p-6 flex flex-col gap-5"
+              <h3 className="text-sm font-black tracking-widest uppercase"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                Identidade Visual
+              </h3>
+
+              {/* ── BANNER ── */}
+              <div className="rounded-2xl border border-white/10 p-5 flex flex-col gap-4"
                 style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
-                <h3 className="text-sm font-black tracking-widest uppercase"
+                <label className="text-xs font-bold tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  Personalização da Loja
-                </h3>
+                  🖼 Banner da Loja
+                </label>
 
-                {/* Avatar */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-white/50 tracking-widest uppercase"
-                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    URL da Imagem de Perfil
-                  </label>
-                  <div className="flex gap-3 items-center">
-                    {customizacao.avatarUrl ? (
-                      <img src={customizacao.avatarUrl} alt="Avatar preview"
-                        className="w-12 h-12 rounded-full object-cover border-2"
-                        style={{ borderColor: customizacao.neonColor + '60' }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center text-white/20">
-                        ⬡
-                      </div>
-                    )}
-                    <input type="url" placeholder="https://exemplo.com/avatar.jpg"
-                      value={customizacao.avatarUrl}
-                      onChange={(e) => salvarCustomizacao({ ...customizacao, avatarUrl: e.target.value })}
-                      className="flex-1 px-3 py-2.5 rounded-xl text-sm text-white outline-none
-                        border border-white/10 focus:border-cyan-400/40 transition-all"
-                      style={{ background: 'rgba(255,255,255,0.05)', fontFamily: 'inherit' }} />
+                {/* Preview atual */}
+                {customizacao.bannerUrl && (
+                  <div className="relative w-full h-24 rounded-xl overflow-hidden border border-white/15">
+                    <img src={customizacao.bannerUrl} alt="Banner atual"
+                      className="w-full h-full object-cover" />
+                    <button onClick={() => salvarCustomizacao({ ...customizacao, bannerUrl: '' })}
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center
+                        text-white text-xs bg-black/60 border border-white/20 hover:bg-red-500/60 transition-all">
+                      ✕
+                    </button>
                   </div>
-                </div>
+                )}
 
-                {/* Banner */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs text-white/50 tracking-widest uppercase"
+                {/* Presets */}
+                <div>
+                  <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    URL do Banner
-                  </label>
-                  {customizacao.bannerUrl && (
-                    <div className="w-full h-20 rounded-xl overflow-hidden border border-white/10 mb-1">
-                      <img src={customizacao.bannerUrl} alt="Banner preview"
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                  )}
-                  <input type="url" placeholder="https://exemplo.com/banner.jpg"
-                    value={customizacao.bannerUrl}
-                    onChange={(e) => salvarCustomizacao({ ...customizacao, bannerUrl: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl text-sm text-white outline-none
-                      border border-white/10 focus:border-cyan-400/40 transition-all"
-                    style={{ background: 'rgba(255,255,255,0.05)', fontFamily: 'inherit' }} />
-                </div>
-
-                {/* Cor Neon */}
-                <div className="flex flex-col gap-3">
-                  <label className="text-xs text-white/50 tracking-widest uppercase"
-                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    Cor do Neon
-                  </label>
-                  <div className="flex gap-3 flex-wrap">
-                    {NEON_OPTIONS.map((op) => (
-                      <button key={op.value}
-                        onClick={() => salvarCustomizacao({ ...customizacao, neonColor: op.value })}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold
-                          tracking-widest uppercase transition-all"
+                    Banners Pré-definidos
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PRESET_BANNERS.map((b) => (
+                      <button key={b.id} onClick={() => salvarCustomizacao({ ...customizacao, bannerUrl: b.url })}
+                        className="relative rounded-lg overflow-hidden h-16 border-2 transition-all"
                         style={{
-                          fontFamily: "'Orbitron', sans-serif",
-                          borderColor: customizacao.neonColor === op.value ? op.value : 'rgba(255,255,255,0.1)',
-                          color: customizacao.neonColor === op.value ? op.value : 'rgba(255,255,255,0.3)',
-                          background: customizacao.neonColor === op.value ? op.value + '15' : 'rgba(255,255,255,0.03)',
-                          boxShadow: customizacao.neonColor === op.value ? `0 0 12px ${op.shadow}` : 'none',
+                          borderColor: customizacao.bannerUrl === b.url ? customizacao.neonColor : 'rgba(255,255,255,0.08)',
+                          boxShadow: customizacao.bannerUrl === b.url ? `0 0 12px ${neonAtual.shadow}` : 'none',
                         }}>
-                        <span className="w-3 h-3 rounded-full" style={{ background: op.value, boxShadow: `0 0 6px ${op.shadow}` }} />
-                        {op.label}
+                        <img src={b.url} alt={b.label} className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 inset-x-0 text-center text-[9px] font-bold py-0.5 tracking-widest"
+                          style={{ fontFamily: "'Orbitron', sans-serif",
+                            background: 'rgba(0,0,0,0.6)', color: 'rgba(255,255,255,0.7)' }}>
+                          {b.label}
+                        </span>
+                        {customizacao.bannerUrl === b.url && (
+                          <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px]"
+                            style={{ background: customizacao.neonColor, color: '#000' }}>✓</span>
+                        )}
                       </button>
                     ))}
                   </div>
-                  <p className="text-white/20 text-xs">
-                    A cor do neon é salva localmente e personaliza seu painel.
-                  </p>
                 </div>
+
+                {/* Upload de banner */}
+                <div>
+                  <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    Upload de Banner Personalizado
+                  </p>
+                  <input ref={bannerInputRef} type="file" accept="image/*"
+                    className="hidden" onChange={onBannerInput} />
+                  <div
+                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5
+                      py-5 cursor-pointer transition-all"
+                    style={{
+                      borderColor: dragOverBanner ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
+                      background: dragOverBanner ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                    }}
+                    onClick={() => bannerInputRef.current?.click()}
+                    onDragOver={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragOverBanner(true); }}
+                    onDragLeave={() => setDragOverBanner(false)}
+                    onDrop={onBannerDrop}>
+                    <span className="text-xl">🖼</span>
+                    <span className="text-xs text-white/30 tracking-widest"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      Arraste ou clique para enviar
+                    </span>
+                    <span className="text-[10px] text-white/20">PNG, JPG, WEBP — máx. 5MB</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── FOTO DE PERFIL ── */}
+              <div className="rounded-2xl border border-white/10 p-5 flex flex-col gap-4"
+                style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
+                <label className="text-xs font-bold tracking-widest uppercase"
+                  style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                  👤 Foto de Perfil
+                </label>
+
+                {/* Preview atual */}
+                {customizacao.avatarUrl && (
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <img src={customizacao.avatarUrl} alt="Avatar atual"
+                        className="w-16 h-16 rounded-full object-cover border-2"
+                        style={{ borderColor: customizacao.neonColor + '80' }} />
+                      <button onClick={() => salvarCustomizacao({ ...customizacao, avatarUrl: '' })}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center
+                          text-white text-[9px] bg-black/70 border border-white/20 hover:bg-red-500/70 transition-all">
+                        ✕
+                      </button>
+                    </div>
+                    <span className="text-xs text-white/30">Foto de perfil atual</span>
+                  </div>
+                )}
+
+                {/* Presets */}
+                <div>
+                  <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    Avatares Pré-definidos
+                  </p>
+                  <div className="flex gap-3 flex-wrap">
+                    {PRESET_AVATARS.map((a) => (
+                      <button key={a.id} onClick={() => salvarCustomizacao({ ...customizacao, avatarUrl: a.url })}
+                        className="flex flex-col items-center gap-1 group">
+                        <div className="w-14 h-14 rounded-full overflow-hidden border-2 transition-all"
+                          style={{
+                            borderColor: customizacao.avatarUrl === a.url ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
+                            boxShadow: customizacao.avatarUrl === a.url ? `0 0 14px ${neonAtual.shadow}` : 'none',
+                          }}>
+                          <img src={a.url} alt={a.label} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[9px] tracking-widest uppercase"
+                          style={{ fontFamily: "'Orbitron', sans-serif",
+                            color: customizacao.avatarUrl === a.url ? customizacao.neonColor : 'rgba(255,255,255,0.3)' }}>
+                          {a.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Upload de avatar */}
+                <div>
+                  <p className="text-[10px] text-white/30 tracking-widest uppercase mb-2"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    Upload de Logo Personalizado
+                  </p>
+                  <input ref={avatarInputRef} type="file" accept="image/*"
+                    className="hidden" onChange={onAvatarInput} />
+                  <div
+                    className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5
+                      py-5 cursor-pointer transition-all"
+                    style={{
+                      borderColor: dragOverAvatar ? customizacao.neonColor : 'rgba(255,255,255,0.12)',
+                      background: dragOverAvatar ? customizacao.neonColor + '10' : 'rgba(255,255,255,0.02)',
+                    }}
+                    onClick={() => avatarInputRef.current?.click()}
+                    onDragOver={(e: DragEvent<HTMLDivElement>) => { e.preventDefault(); setDragOverAvatar(true); }}
+                    onDragLeave={() => setDragOverAvatar(false)}
+                    onDrop={onAvatarDrop}>
+                    <span className="text-xl">👤</span>
+                    <span className="text-xs text-white/30 tracking-widest"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      Arraste ou clique para enviar
+                    </span>
+                    <span className="text-[10px] text-white/20">PNG, JPG, WEBP — recomendado 1:1</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── COR DO NEON ── */}
+              <div className="rounded-2xl border border-white/10 p-5 flex flex-col gap-3"
+                style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)' }}>
+                <label className="text-xs font-bold tracking-widest uppercase"
+                  style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                  ⚡ Cor do Neon
+                </label>
+                <div className="flex gap-3 flex-wrap">
+                  {NEON_OPTIONS.map((op) => (
+                    <button key={op.value}
+                      onClick={() => salvarCustomizacao({ ...customizacao, neonColor: op.value })}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-bold
+                        tracking-widest uppercase transition-all"
+                      style={{
+                        fontFamily: "'Orbitron', sans-serif",
+                        borderColor: customizacao.neonColor === op.value ? op.value : 'rgba(255,255,255,0.1)',
+                        color: customizacao.neonColor === op.value ? op.value : 'rgba(255,255,255,0.3)',
+                        background: customizacao.neonColor === op.value ? op.value + '15' : 'rgba(255,255,255,0.03)',
+                        boxShadow: customizacao.neonColor === op.value ? `0 0 12px ${op.shadow}` : 'none',
+                      }}>
+                      <span className="w-3 h-3 rounded-full" style={{ background: op.value, boxShadow: `0 0 6px ${op.shadow}` }} />
+                      {op.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/20 text-xs">
+                  A cor do neon é salva localmente e personaliza seu painel.
+                </p>
               </div>
             </div>
           )}

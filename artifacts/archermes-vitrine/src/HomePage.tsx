@@ -45,6 +45,7 @@ interface LojaParceiraMock {
   nome: string;
   cor: string;
   corSombra: string;
+  banner: string;
   logo: string;
   produtos: string[];
 }
@@ -65,6 +66,7 @@ const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
     nome: 'Nike Drop Zone',
     cor: '#00e5ff',
     corSombra: 'rgba(0,229,255,0.4)',
+    banner: 'https://images.unsplash.com/photo-1556906781-9a9bf1b3a9cc?w=400&h=100&fit=crop',
     logo: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=80&h=80&fit=crop&crop=center',
     produtos: [
       'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=120&h=120&fit=crop',
@@ -78,6 +80,7 @@ const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
     nome: 'TechVault',
     cor: '#c084fc',
     corSombra: 'rgba(192,132,252,0.4)',
+    banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=100&fit=crop',
     logo: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=80&h=80&fit=crop&crop=center',
     produtos: [
       'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=120&h=120&fit=crop',
@@ -91,6 +94,7 @@ const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
     nome: 'NeonFit',
     cor: '#4ade80',
     corSombra: 'rgba(74,222,128,0.4)',
+    banner: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=400&h=100&fit=crop',
     logo: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=80&h=80&fit=crop&crop=center',
     produtos: [
       'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=120&h=120&fit=crop',
@@ -104,6 +108,7 @@ const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
     nome: 'Galaxy Games',
     cor: '#fb923c',
     corSombra: 'rgba(251,146,60,0.4)',
+    banner: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&h=100&fit=crop',
     logo: 'https://images.unsplash.com/photo-1486572788966-cfd3df1f5b42?w=80&h=80&fit=crop&crop=center',
     produtos: [
       'https://images.unsplash.com/photo-1486572788966-cfd3df1f5b42?w=120&h=120&fit=crop',
@@ -117,6 +122,7 @@ const MOCK_LOJAS_PARCEIRAS: LojaParceiraMock[] = [
     nome: 'Cyber Beauty',
     cor: '#f472b6',
     corSombra: 'rgba(244,114,182,0.4)',
+    banner: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=100&fit=crop',
     logo: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=80&h=80&fit=crop&crop=center',
     produtos: [
       'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?w=120&h=120&fit=crop',
@@ -550,21 +556,40 @@ export default function HomePage() {
         </div>
         <div className="parceiras-scroll">
           {MOCK_LOJAS_PARCEIRAS.map((loja) => (
-            <div key={loja.id} className="parceira-card">
-              <div className="parceira-logo-wrap" style={{
-                borderColor: loja.cor,
-                boxShadow: `0 0 16px ${loja.corSombra}, inset 0 0 12px ${loja.corSombra.replace('0.4', '0.08')}`,
+            <div key={loja.id} className="parceira-card"
+              style={{ borderColor: loja.cor + '30' }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 28px ${loja.corSombra}`;
+                (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '66';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
+                (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '30';
               }}>
-                <img src={loja.logo} alt={loja.nome} className="parceira-logo-img" loading="lazy" />
+
+              {/* Banner */}
+              <img src={loja.banner} alt="" className="parceira-banner" loading="lazy" />
+
+              {/* Logo overlapping banner */}
+              <div className="parceira-logo-area">
+                <div className="parceira-logo-wrap" style={{
+                  borderColor: loja.cor,
+                  boxShadow: `0 0 14px ${loja.corSombra}`,
+                }}>
+                  <img src={loja.logo} alt={loja.nome} className="parceira-logo-img" loading="lazy" />
+                </div>
+                <span className="parceira-nome" style={{ color: loja.cor }}>
+                  {loja.nome}
+                </span>
               </div>
-              <span className="parceira-nome" style={{ color: loja.cor,
-                textShadow: `0 0 8px ${loja.corSombra}` }}>
-                {loja.nome}
-              </span>
-              <div className="parceira-mini-grid">
-                {loja.produtos.map((img, i) => (
-                  <img key={i} src={img} alt="" className="parceira-thumb" loading="lazy" />
-                ))}
+
+              {/* Products grid */}
+              <div className="parceira-body">
+                <div className="parceira-mini-grid">
+                  {loja.produtos.map((img, i) => (
+                    <img key={i} src={img} alt="" className="parceira-thumb" loading="lazy" />
+                  ))}
+                </div>
               </div>
             </div>
           ))}
