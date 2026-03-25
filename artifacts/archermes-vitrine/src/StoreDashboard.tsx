@@ -4,6 +4,7 @@ import { useWallet } from './walletContext';
 import { useLang } from './i18n';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
+import { saveStoreToRegistry, addBoostedProduct, getItemImages, getNeonShadow } from './registry';
 
 interface StoreInfo {
   storeName: string;
@@ -19,6 +20,8 @@ interface MeuProduto {
   category: string;
   isActive: boolean;
   isSold: boolean;
+  imageUrl?: string;
+  isBoosted?: boolean;
 }
 
 interface Customizacao {
@@ -85,6 +88,9 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  const [boostProd, setBoostProd] = useState<MeuProduto | null>(null);
+  const [boostEstado, setBoostEstado] = useState<'idle' | 'processando' | 'sucesso'>('idle');
+
   const enderecoUsuario = walletAddress ?? '';
 
   // Carregar customização do localStorage
@@ -107,7 +113,31 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   function salvarCustomizacao(next: Customizacao) {
     setCustomizacao(next);
     try { localStorage.setItem(`${LS_KEY}_${enderecoUsuario}`, JSON.stringify(next)); } catch { /* ignore */ }
+    if (loja?.storeName && enderecoUsuario) {
+      saveStoreToRegistry({
+        address: enderecoUsuario,
+        storeName: loja.storeName,
+        avatarUrl: next.avatarUrl,
+        bannerUrl: next.bannerUrl,
+        neonColor: next.neonColor,
+        tier: loja.tier,
+        productCount: Number(loja.productCount),
+      });
+    }
   }
+
+  useEffect(() => {
+    if (!enderecoUsuario || !loja?.storeName) return;
+    saveStoreToRegistry({
+      address: enderecoUsuario,
+      storeName: loja.storeName,
+      avatarUrl: customizacao.avatarUrl,
+      bannerUrl: customizacao.bannerUrl,
+      neonColor: customizacao.neonColor,
+      tier: loja.tier,
+      productCount: Number(loja.productCount),
+    });
+  }, [loja, customizacao, enderecoUsuario]);
 
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -191,6 +221,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       for (let i = 1; i <= Number(total); i++) {
         const item = await contrato.items(i);
         if (item.seller.toLowerCase() === enderecoUsuario.toLowerCase()) {
+          const imgs = getItemImages(Number(item.id));
+          const boostedRaw = localStorage.getItem(`archermes_boosted_products`);
+          const boostedList = boostedRaw ? (JSON.parse(boostedRaw) as Array<{ id: number }>) : [];
+          const isBoosted = boostedList.some((b) => b.id === Number(item.id));
           lista.push({
             id: Number(item.id),
             itemName: item.itemName,
@@ -198,6 +232,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
             category: item.category,
             isActive: item.isActive,
             isSold: item.isSold,
+            imageUrl: imgs[0],
+            isBoosted,
           });
         }
       }
@@ -257,6 +293,26 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
         localStorage.setItem(`${LS_DELETED_KEY}_${enderecoUsuario}`, JSON.stringify([...next]));
       } catch { /* ignore */ }
     }
+  }
+
+  async function handleBoost(prod: MeuProduto) {
+    setBoostEstado('processando');
+    await new Promise((r) => setTimeout(r, 2000));
+    const image = prod.imageUrl ?? 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=260&fit=crop';
+    addBoostedProduct({
+      id: prod.id,
+      itemName: prod.itemName,
+      priceEth: prod.priceEth,
+      category: prod.category,
+      currency: 'ETH',
+      image,
+      destaque: prod.id % 2 === 0 ? 'ouro' : 'roxo',
+      storeAddress: enderecoUsuario,
+      storeName: loja?.storeName ?? '',
+      boostedAt: Date.now(),
+    });
+    setMeusProdutos((prev) => prev.map((p) => p.id === prod.id ? { ...p, isBoosted: true } : p));
+    setBoostEstado('sucesso');
   }
 
   async function handleSetRastreio(id: number, code: string) {
@@ -644,6 +700,19 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         className="btn-neon btn-neon-sm btn-neon-delete">
                         🗑 {t('dash.deleteItem')}
                       </button>
+                      {prod.isBoosted ? (
+                        <span className="text-[10px] px-2 py-1 rounded-lg font-bold tracking-widest"
+                          style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)' }}>
+                          {t('boost.alreadyBoosted')}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => { setBoostProd(prod); setBoostEstado('idle'); }}
+                          className="btn-neon btn-neon-sm"
+                          style={{ borderColor: '#fbbf24', color: '#fbbf24', background: 'rgba(251,191,36,0.08)', boxShadow: '0 0 10px rgba(251,191,36,0.2)' }}>
+                          {t('dash.boost')}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -906,6 +975,85 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
             </div>
           )}
         </>
+      )}
+
+      {/* ── MODAL BOOST ── */}
+      {boostProd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5"
+            style={{ background: 'linear-gradient(145deg,rgba(20,10,40,0.98),rgba(10,13,26,0.99))', border: '1px solid rgba(251,191,36,0.35)', boxShadow: '0 0 40px rgba(251,191,36,0.2)' }}>
+
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: '1.4rem', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.6))' }}>⚡</span>
+              <h3 className="font-black tracking-widest uppercase text-base"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24', textShadow: '0 0 16px rgba(251,191,36,0.5)' }}>
+                {t('boost.modalTitle')}
+              </h3>
+            </div>
+
+            {boostProd.imageUrl && (
+              <div className="rounded-xl overflow-hidden border border-yellow-400/20" style={{ height: '120px' }}>
+                <img src={boostProd.imageUrl} alt={boostProd.itemName} className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <p className="text-[10px] text-white/30 tracking-widest uppercase"
+                style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                {t('boost.modalProduct')}
+              </p>
+              <p className="font-bold text-white text-sm" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                {boostProd.itemName}
+              </p>
+              <p className="text-white/40 text-xs mt-1">{t('boost.modalDesc')}</p>
+            </div>
+
+            <div className="h-px" style={{ background: 'rgba(251,191,36,0.15)' }} />
+
+            {boostEstado === 'idle' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => void handleBoost(boostProd)}
+                  className="flex-1 py-3 rounded-xl font-black text-xs tracking-widest uppercase transition-all duration-200"
+                  style={{ fontFamily: "'Orbitron', sans-serif", background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.5)', color: '#fbbf24', boxShadow: '0 0 16px rgba(251,191,36,0.2)' }}>
+                  {t('boost.confirm')}
+                </button>
+                <button
+                  onClick={() => setBoostProd(null)}
+                  className="px-4 py-3 rounded-xl text-xs tracking-widest uppercase text-white/40 hover:text-white/60 transition-colors border border-white/10">
+                  {t('boost.cancel')}
+                </button>
+              </div>
+            )}
+
+            {boostEstado === 'processando' && (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <div className="w-8 h-8 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin" />
+                <p className="text-yellow-400/80 text-xs tracking-widest"
+                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                  {t('boost.processing')}
+                </p>
+              </div>
+            )}
+
+            {boostEstado === 'sucesso' && (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <span style={{ fontSize: '2rem' }}>🚀</span>
+                <p className="text-yellow-400 text-xs text-center font-bold tracking-widest"
+                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                  {t('boost.success')}
+                </p>
+                <button
+                  onClick={() => setBoostProd(null)}
+                  className="mt-1 px-6 py-2 rounded-lg text-xs font-bold tracking-widest uppercase text-black"
+                  style={{ background: '#fbbf24', fontFamily: "'Orbitron', sans-serif" }}>
+                  ✓ OK
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

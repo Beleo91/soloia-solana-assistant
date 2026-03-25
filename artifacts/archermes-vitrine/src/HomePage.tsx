@@ -11,6 +11,7 @@ import {
 } from './stablecoins';
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
+import { getStoreRegistry, getBoostedProducts, getNeonShadow, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -240,6 +241,22 @@ export default function HomePage() {
   const [txHash, setTxHash] = useState('');
   const [erroMsg, setErroMsg] = useState('');
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
+
+  // Dados dinâmicos do localStorage
+  const [lojasReais, setLojasReais] = useState<RegistryStore[]>([]);
+  const [produtosImpulsionados, setProdutosImpulsionados] = useState<BoostedProductEntry[]>([]);
+
+  function carregarDadosLocais() {
+    setLojasReais(getStoreRegistry());
+    setProdutosImpulsionados(getBoostedProducts());
+  }
+
+  useEffect(() => {
+    carregarDadosLocais();
+    const onFocus = () => carregarDadosLocais();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
 
   // Vitrine
   const [vitrine, setVitrine] = useState<ItemBlockchain[]>([]);
@@ -483,7 +500,7 @@ export default function HomePage() {
             {isConnected && <button onClick={disconnect} className="btn-sair">Sair</button>}
           </div>
         </header>
-        {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => setPagina('home')} />}
+        {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => { setPagina('home'); carregarDadosLocais(); }} />}
         {pagina === 'afiliado' && <AffiliateDashboard onVoltar={() => setPagina('home')} />}
       </div>
     );
@@ -601,7 +618,18 @@ export default function HomePage() {
           </div>
         </div>
         <div className="parceiras-scroll">
-          {MOCK_LOJAS_PARCEIRAS.map((loja) => (
+          {(lojasReais.length > 0 ? lojasReais.map((store): LojaParceiraMock => ({
+            id: store.address,
+            nome: store.storeName,
+            cor: store.neonColor,
+            corSombra: getNeonShadow(store.neonColor),
+            banner: store.bannerUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=100&fit=crop',
+            logo: store.avatarUrl || 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=80&h=80&fit=crop',
+            produtos: produtosImpulsionados
+              .filter((p) => p.storeAddress.toLowerCase() === store.address.toLowerCase())
+              .slice(0, 4)
+              .map((p) => p.image),
+          })) : MOCK_LOJAS_PARCEIRAS).map((loja) => (
             <div key={loja.id} className="parceira-card"
               style={{ borderColor: loja.cor + '30' }}
               onMouseEnter={(e) => {
@@ -632,9 +660,14 @@ export default function HomePage() {
               {/* Products grid */}
               <div className="parceira-body">
                 <div className="parceira-mini-grid">
-                  {loja.produtos.map((img, i) => (
+                  {loja.produtos.length > 0 ? loja.produtos.map((img, i) => (
                     <img key={i} src={img} alt="" className="parceira-thumb" loading="lazy" />
-                  ))}
+                  )) : (
+                    <div className="col-span-2 flex items-center justify-center h-full opacity-20 text-xs tracking-widest"
+                      style={{ fontFamily: "'Orbitron', sans-serif", color: loja.cor }}>
+                      ⬡
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -658,8 +691,17 @@ export default function HomePage() {
             </p>
           </div>
         </div>
+        {produtosImpulsionados.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 mb-8"
+            style={{ border: '1px dashed rgba(251,191,36,0.15)', borderRadius: '1rem', background: 'rgba(251,191,36,0.03)' }}>
+            <span className="text-4xl opacity-30">🚀</span>
+            <p className="text-white/40 text-sm font-bold tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('boost.emptyState')}</p>
+            <p className="text-white/20 text-xs text-center max-w-xs">{t('boost.emptyStateDesc')}</p>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          {MOCK_IMPULSIONADOS.map((item) => {
+          {produtosImpulsionados.map((item) => {
             const isOuro = item.destaque === 'ouro';
             const corBorda = isOuro ? '#fbbf24' : '#c084fc';
             const corSombra = isOuro ? 'rgba(251,191,36,0.35)' : 'rgba(192,132,252,0.35)';
