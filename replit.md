@@ -3,6 +3,7 @@
 ## Overview
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+<!-- maintainer: Leonardo Soares <leosoares482@gmail.com> -->
 
 ## Stack
 
