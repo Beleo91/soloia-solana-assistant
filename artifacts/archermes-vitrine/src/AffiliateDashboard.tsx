@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
+import { useWallet } from './walletContext';
 
 const MISSOES = [
   {
@@ -19,14 +19,12 @@ const MISSOES = [
 ];
 
 export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void }) {
-  const { authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
-  const { connectWallet } = useConnectWallet();
+  const { isConnected, connect, address: walletAddress } = useWallet();
 
   const [clicados, setClicados] = useState<Set<string>>(new Set());
   const [copiado, setCopiado] = useState(false);
 
-  const endereco = wallets[0]?.address ?? '';
+  const endereco = walletAddress ?? '';
   const linkAfiliado = endereco
     ? `${window.location.origin}${window.location.pathname}?ref=${endereco}`
     : '';
@@ -87,8 +85,8 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
         </p>
       </div>
 
-      {/* Sem autenticação */}
-      {!authenticated && (
+      {/* Sem carteira */}
+      {!isConnected && (
         <div
           className="rounded-2xl border border-white/10 p-10 flex flex-col items-center gap-5"
           style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(16px)' }}
@@ -96,32 +94,16 @@ export default function AffiliateDashboard({ onVoltar }: { onVoltar: () => void 
           <span className="text-5xl opacity-30">🔒</span>
           <p className="text-white/40 text-sm tracking-widest uppercase text-center"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            Faça login para acessar o portal
+            Conecte sua carteira para acessar o portal
           </p>
-          <button onClick={login} className="btn-neon btn-neon-filled">
+          <button onClick={() => void connect()} className="btn-neon btn-neon-filled">
             Entrar
           </button>
         </div>
       )}
 
-      {/* Sem carteira */}
-      {authenticated && !endereco && (
-        <div
-          className="rounded-2xl border border-yellow-400/20 p-10 flex flex-col items-center gap-5"
-          style={{ background: 'rgba(251,191,36,0.04)', backdropFilter: 'blur(16px)' }}
-        >
-          <span className="text-5xl">⚡</span>
-          <p className="text-white/60 text-sm text-center">
-            Conecte uma carteira para gerar seu link de afiliado.
-          </p>
-          <button onClick={() => connectWallet()} className="btn-neon btn-neon-gold">
-            Conectar Carteira
-          </button>
-        </div>
-      )}
-
       {/* Dashboard principal */}
-      {authenticated && endereco && (
+      {isConnected && endereco && (
         <div className="flex flex-col gap-6">
 
           {/* Como funciona */}

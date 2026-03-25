@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
-import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
+import { useWallet } from './walletContext';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import {
@@ -230,9 +230,7 @@ function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
 }
 
 export default function HomePage() {
-  const { login, logout, authenticated, user } = usePrivy();
-  const { wallets } = useWallets();
-  const { connectWallet } = useConnectWallet();
+  const { connect, disconnect, isConnected, address: walletAddress, switchToArc, getProvider } = useWallet();
 
   const [pagina, setPagina] = useState<Pagina>('home');
   const [modalAberto, setModalAberto] = useState(false);
@@ -390,11 +388,10 @@ export default function HomePage() {
     e.preventDefault();
     setEstado('enviando'); setErroMsg('');
     try {
-      const wallet = wallets[0];
-      if (!wallet) { setEstado('sem-carteira'); return; }
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      if (!isConnected) { setEstado('sem-carteira'); return; }
+      await switchToArc();
+      const provider = getProvider();
+      if (!provider) { setEstado('sem-carteira'); return; }
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const precoWei = parseUnits(form.preco, 18);
@@ -420,7 +417,7 @@ export default function HomePage() {
 
   // ── COMPRA ──
   function abrirCompra(item: ItemBlockchain) {
-    if (!authenticated) { login(); return; }
+    if (!isConnected) { void connect(); return; }
     setItemParaComprar(item);
     setBuyEstado('idle');
     setBuyErro('');
@@ -429,14 +426,13 @@ export default function HomePage() {
 
   async function confirmarCompra() {
     if (!itemParaComprar) return;
-    const wallet = wallets[0];
-    if (!wallet) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
+    if (!isConnected) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
     setBuyEstado('confirmando');
     const currency = itemParaComprar.currency ?? 'ETH';
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider();
+      if (!provider) { setBuyEstado('erro'); setBuyErro('Provedor de carteira não encontrado.'); return; }
       const signer = await provider.getSigner();
 
       if (currency === 'ETH') {
@@ -482,7 +478,7 @@ export default function HomePage() {
           </div>
           <div className="acoes-header">
             <button onClick={() => setPagina('home')} className="btn-entrar">← Início</button>
-            {authenticated && <button onClick={() => logout()} className="btn-sair">Sair</button>}
+            {isConnected && <button onClick={disconnect} className="btn-sair">Sair</button>}
           </div>
         </header>
         {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => setPagina('home')} />}
@@ -499,20 +495,20 @@ export default function HomePage() {
           <img src="/images/logo-ahs.png" alt="ARCHERMES" className="logo-img" />
           <span className="logo-texto">ARCHERMES</span>
         </div>
-        {!authenticated ? (
+        {!isConnected ? (
           <div className="acoes-header">
             <button onClick={() => setPagina('afiliado')} className="btn-entrar"
               style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80' }}>
               🔗 Afiliar
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">Minha Loja</button>
-            <button onClick={login} className="btn-entrar">Entrar</button>
-            <button onClick={login} className="btn-login">Criar Minha Loja</button>
+            <button onClick={() => void connect()} className="btn-entrar">Entrar</button>
+            <button onClick={() => void connect()} className="btn-login">Criar Minha Loja</button>
           </div>
         ) : (
           <div className="painel-usuario">
             <span style={{ fontSize: '0.82rem' }}>
-              {user?.email ? user.email.address : abreviarEndereco(wallets[0]?.address ?? '0x...')}
+              {abreviarEndereco(walletAddress || '0x...')}
             </span>
             <button onClick={() => setPagina('afiliado')} className="btn-entrar"
               style={{ borderColor: 'rgba(74,222,128,0.5)', color: '#4ade80', fontSize: '0.7rem' }}>
@@ -520,7 +516,7 @@ export default function HomePage() {
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">⬡ Minha Loja</button>
             <button onClick={abrirModal} className="btn-anunciar">+ Anunciar</button>
-            <button onClick={() => logout()} className="btn-sair">Sair</button>
+            <button onClick={disconnect} className="btn-sair">Sair</button>
           </div>
         )}
       </header>
@@ -698,7 +694,7 @@ export default function HomePage() {
                   <button className="btn-neon btn-neon-full btn-neon-sm mt-1"
                     style={{ borderColor: corBorda + '55', color: corBorda,
                       background: corBorda + '12' }}
-                    onClick={() => login()}>
+                    onClick={() => void connect()}>
                     🔒 Entrar para comprar
                   </button>
                 </div>
@@ -770,7 +766,7 @@ export default function HomePage() {
               style={{ fontFamily: "'Orbitron', sans-serif" }}>
               Nenhum produto encontrado
             </p>
-            {authenticated && (
+            {isConnected && (
               <button onClick={abrirModal}
                 className="mt-2 text-xs text-cyan-400 border border-cyan-400/30 px-4 py-2 rounded-lg
                   hover:bg-cyan-400/10 transition-all duration-200">
@@ -888,7 +884,7 @@ export default function HomePage() {
                     className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
                     onClick={() => abrirCompra(item)}
                   >
-                    {authenticated ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
+                    {isConnected ? '⚡ Comprar Agora' : '🔒 Entrar para Comprar'}
                   </button>
                 </div>
               );
@@ -924,7 +920,7 @@ export default function HomePage() {
                 <div className="sucesso-icone" style={{ color: '#f59e0b' }}>⚠</div>
                 <h2>Carteira não encontrada</h2>
                 <p>Conecte uma carteira para publicar na blockchain.</p>
-                <button className="btn-publicar" onClick={() => { connectWallet(); setEstado('idle'); }}>Conectar Carteira</button>
+                <button className="btn-publicar" onClick={() => { void connect(); setEstado('idle'); }}>Conectar Carteira</button>
                 <button className="btn-sair" style={{ marginTop: '0.5rem', width: '100%' }} onClick={() => setEstado('idle')}>Voltar</button>
               </div>
             )}

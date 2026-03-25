@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from 'ethers';
+import { useWallet } from './walletContext';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 
@@ -53,8 +53,7 @@ const PRESET_AVATARS = [
 type DashEstado = 'idle' | 'criando' | 'sucesso' | 'erro';
 
 export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
-  const { authenticated, login } = usePrivy();
-  const { wallets } = useWallets();
+  const { isConnected, connect, address: walletAddress, switchToArc, getProvider } = useWallet();
 
   const [loja, setLoja] = useState<StoreInfo | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -84,7 +83,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const enderecoUsuario = wallets[0]?.address ?? '';
+  const enderecoUsuario = walletAddress ?? '';
 
   // Carregar customização do localStorage
   useEffect(() => {
@@ -205,18 +204,16 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   };
 
   useEffect(() => {
-    if (abaAtiva === 'produtos' && authenticated) carregarMeusProdutos();
-  }, [abaAtiva, authenticated, enderecoUsuario]);
+    if (abaAtiva === 'produtos' && isConnected) carregarMeusProdutos();
+  }, [abaAtiva, isConnected, enderecoUsuario]);
 
   async function handleCriarLoja(isPro: boolean) {
     if (!nomeLoja.trim()) { setErroMsg('Digite o nome da sua loja.'); return; }
-    const wallet = wallets[0];
-    if (!wallet) return;
+    if (!isConnected) return;
     setEstado('criando'); setErroMsg('');
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -233,12 +230,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   }
 
   async function handleCancelarItem(id: number) {
-    const wallet = wallets[0]; if (!wallet) return;
+    if (!isConnected) return;
     setTxStatus((p) => ({ ...p, [id]: 'cancelando' }));
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const tx = await contrato.cancelItem(id);
@@ -263,12 +259,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
 
   async function handleSetRastreio(id: number, code: string) {
     if (!code.trim()) return;
-    const wallet = wallets[0]; if (!wallet) return;
+    if (!isConnected) return;
     setTxStatus((p) => ({ ...p, [id]: 'rastreando' }));
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const tx = await contrato.setTrackingCode(id, code.trim());
@@ -279,11 +274,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   }
 
   async function handleUpgradePro() {
-    const wallet = wallets[0]; if (!wallet) return;
+    if (!isConnected) return;
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -296,11 +290,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   }
 
   async function handleRenovar() {
-    const wallet = wallets[0]; if (!wallet) return;
+    if (!isConnected) return;
     try {
-      await wallet.switchChain(arcTestnet.id);
-      const eip1193 = await wallet.getEthereumProvider();
-      const provider = new BrowserProvider(eip1193);
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -344,20 +337,20 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       </div>
 
       {/* Não autenticado */}
-      {!authenticated && (
+      {!isConnected && (
         <div className="flex flex-col items-center py-20 gap-4">
           <div className="text-5xl opacity-30">🔒</div>
           <p className="text-white/40 text-sm tracking-widest uppercase"
             style={{ fontFamily: "'Orbitron', sans-serif" }}>
-            Faça login para acessar sua loja
+            Conecte sua carteira para acessar sua loja
           </p>
-          <button onClick={login} className="btn-neon btn-neon-filled btn-neon-lg">
+          <button onClick={() => void connect()} className="btn-neon btn-neon-filled btn-neon-lg">
             Entrar
           </button>
         </div>
       )}
 
-      {authenticated && carregando && (
+      {isConnected && carregando && (
         <div className="flex flex-col items-center py-20 gap-4">
           <div className="w-10 h-10 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
           <p className="text-cyan-400/60 text-sm tracking-widest uppercase"
@@ -385,7 +378,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       )}
 
       {/* Escolha de plano - sem loja */}
-      {authenticated && !carregando && !lojaAtiva && estado !== 'sucesso' && (
+      {isConnected && !carregando && !lojaAtiva && estado !== 'sucesso' && (
         <div className="flex flex-col gap-8">
           <div>
             <h2 className="text-lg font-black tracking-widest uppercase mb-1"
@@ -469,7 +462,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       )}
 
       {/* Loja ativa */}
-      {authenticated && !carregando && lojaAtiva && estado !== 'sucesso' && (
+      {isConnected && !carregando && lojaAtiva && estado !== 'sucesso' && (
         <>
           {/* Abas */}
           <div className="flex gap-1 mb-8 rounded-xl p-1"

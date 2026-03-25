@@ -1,5 +1,6 @@
 import { PrivyProvider } from '@privy-io/react-auth';
 import { arcTestnet } from './chains';
+import { WalletProvider } from './walletContext';
 import HomePage from './HomePage';
 
 function App() {
@@ -7,7 +8,7 @@ function App() {
     <PrivyProvider
       appId="cmmttjv0y01n10dk0bt0hr1py"
       config={{
-        loginMethods: ['email', 'wallet', 'sms', 'google'],
+        loginMethods: ['wallet'],
         appearance: {
           theme: 'dark',
           accentColor: '#676FFF',
@@ -18,11 +19,13 @@ function App() {
         defaultChain: arcTestnet,
         supportedChains: [arcTestnet],
         embeddedWallets: {
-          ethereum: { createOnLogin: 'all-users' },
+          ethereum: { createOnLogin: 'users-without-wallets' },
         },
       }}
     >
-      <HomePage />
+      <WalletProvider>
+        <HomePage />
+      </WalletProvider>
     </PrivyProvider>
   );
 }
