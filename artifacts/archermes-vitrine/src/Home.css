@@ -503,6 +503,21 @@ body::after {
   text-shadow: 0 0 12px rgba(220,38,38,0.6);
 }
 
+/* ── Currency badge (USDC / EURC) ── */
+.currency-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  border: 1px solid;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 /* ── Twitter/X Blue ── */
 .btn-neon-twitter {
   background: rgba(29,161,242,0.09);

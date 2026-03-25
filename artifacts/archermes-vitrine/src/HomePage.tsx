@@ -3,12 +3,19 @@ import { usePrivy, useWallets, useConnectWallet } from '@privy-io/react-auth';
 import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
+import {
+  STABLECOIN_ADDRESSES, STABLECOIN_META,
+  approveERC20, transferERC20, toTokenAmount,
+  formatStablecoinPrice, type StablecoinSymbol,
+} from './stablecoins';
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
+
+type Moeda = 'ETH' | StablecoinSymbol;
 
 interface ItemBlockchain {
   id: number;
@@ -17,7 +24,13 @@ interface ItemBlockchain {
   category: string;
   seller: string;
   images?: string[];
+  currency?: Moeda;
 }
+
+const MOCK_ITEM_CURRENCY: Record<number, StablecoinSymbol> = {
+  1: 'USDC',
+  2: 'EURC',
+};
 
 const MOCK_ITEM_IMAGES: Record<number, string[]> = {
   1: [
@@ -171,6 +184,7 @@ export default function HomePage() {
             category: item.category,
             seller: item.seller,
             images: MOCK_ITEM_IMAGES[id],
+            currency: MOCK_ITEM_CURRENCY[id] ?? 'ETH',
           });
         }
       }
@@ -254,17 +268,33 @@ export default function HomePage() {
     const wallet = wallets[0];
     if (!wallet) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
     setBuyEstado('confirmando');
+    const currency = itemParaComprar.currency ?? 'ETH';
     try {
       await wallet.switchChain(arcTestnet.id);
       const eip1193 = await wallet.getEthereumProvider();
       const provider = new BrowserProvider(eip1193);
       const signer = await provider.getSigner();
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const priceWei = parseUnits(itemParaComprar.priceEth, 18);
-      const referrer = refAddress !== ZERO_ADDRESS ? refAddress : ZERO_ADDRESS;
-      const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: priceWei });
-      await tx.wait();
-      setBuyTx(tx.hash);
+
+      if (currency === 'ETH') {
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        const priceWei = parseUnits(itemParaComprar.priceEth, 18);
+        const referrer = refAddress !== ZERO_ADDRESS ? refAddress : ZERO_ADDRESS;
+        const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: priceWei });
+        await tx.wait();
+        setBuyTx(tx.hash);
+      } else {
+        // ── ERC-20 flow (USDC / EURC) ──────────────────────────────────────────
+        const tokenAddress = STABLECOIN_ADDRESSES[currency];
+        const amount = toTokenAmount(itemParaComprar.priceEth, currency);
+        // Step 1: approve the marketplace contract to spend the tokens
+        const approveTx = await approveERC20(signer, tokenAddress, CONTRACT_ADDRESS, amount);
+        await approveTx.wait();
+        // Step 2: direct transfer to seller (placeholder until contract supports ERC-20)
+        const transferTx = await transferERC20(signer, tokenAddress, itemParaComprar.seller, amount);
+        await transferTx.wait();
+        setBuyTx(transferTx.hash);
+      }
+
       setBuyEstado('sucesso');
       carregarVitrine();
     } catch (err: unknown) {
@@ -528,12 +558,27 @@ export default function HomePage() {
                   <div className="flex items-end justify-between">
                     <div>
                       <p className="text-[10px] text-white/30 tracking-widest uppercase mb-0.5">Preço</p>
-                      <p className="text-lg font-black"
-                        style={{ color: isPro ? '#fbbf24' : '#00e5ff', fontFamily: "'Orbitron', sans-serif",
-                          textShadow: isPro ? '0 0 12px rgba(251,191,36,0.5)' : '0 0 12px rgba(0,229,255,0.4)' }}>
-                        {parseFloat(item.priceEth).toFixed(4)}
-                        <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="text-lg font-black"
+                          style={{ color: isPro ? '#fbbf24' : (item.currency === 'USDC' ? '#4ade80' : item.currency === 'EURC' ? '#60a5fa' : '#00e5ff'), fontFamily: "'Orbitron', sans-serif",
+                            textShadow: isPro ? '0 0 12px rgba(251,191,36,0.5)' : '0 0 12px rgba(0,229,255,0.4)' }}>
+                          {item.currency && item.currency !== 'ETH'
+                            ? formatStablecoinPrice(item.priceEth, item.currency)
+                            : parseFloat(item.priceEth).toFixed(4)}
+                          {(!item.currency || item.currency === 'ETH') && (
+                            <span className="text-xs text-white/40 ml-1 font-normal">ETH</span>
+                          )}
+                        </p>
+                        {item.currency && item.currency !== 'ETH' && (
+                          <span className="currency-badge" style={{
+                            color: STABLECOIN_META[item.currency].cor,
+                            background: STABLECOIN_META[item.currency].corFundo,
+                            borderColor: STABLECOIN_META[item.currency].cor + '55',
+                          }}>
+                            {item.currency}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
                   </div>
@@ -703,17 +748,38 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-cyan-400/20 p-4 flex items-center justify-between"
-                    style={{ background: 'rgba(0,229,255,0.04)' }}>
-                    <span className="text-xs text-white/50 tracking-widest uppercase"
-                      style={{ fontFamily: "'Orbitron', sans-serif" }}>Total</span>
-                    <span className="text-2xl font-black"
-                      style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
-                        textShadow: '0 0 12px rgba(0,229,255,0.4)' }}>
-                      {parseFloat(itemParaComprar.priceEth).toFixed(4)}
-                      <span className="text-sm text-white/40 ml-1 font-normal">ETH</span>
-                    </span>
-                  </div>
+                  {(() => {
+                    const cur = itemParaComprar.currency ?? 'ETH';
+                    const meta = cur !== 'ETH' ? STABLECOIN_META[cur as StablecoinSymbol] : null;
+                    const priceDisplay = meta
+                      ? formatStablecoinPrice(itemParaComprar.priceEth, cur as StablecoinSymbol)
+                      : parseFloat(itemParaComprar.priceEth).toFixed(4);
+                    const cor = meta?.cor ?? '#00e5ff';
+                    const fundo = meta?.corFundo ?? 'rgba(0,229,255,0.04)';
+                    const borda = meta ? meta.cor + '33' : 'rgba(0,229,255,0.2)';
+                    return (
+                      <div className="rounded-xl border p-4 flex items-center justify-between"
+                        style={{ background: fundo, borderColor: borda }}>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-white/50 tracking-widest uppercase"
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>Total</span>
+                          {meta && (
+                            <span className="currency-badge" style={{
+                              color: meta.cor, background: meta.corFundo, borderColor: meta.cor + '55',
+                            }}>
+                              {cur}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-2xl font-black"
+                          style={{ fontFamily: "'Orbitron', sans-serif", color: cor,
+                            textShadow: `0 0 12px ${cor}66` }}>
+                          {priceDisplay}
+                          {cur === 'ETH' && <span className="text-sm text-white/40 ml-1 font-normal">ETH</span>}
+                        </span>
+                      </div>
+                    );
+                  })()}
 
                   {refAddress !== ZERO_ADDRESS && (
                     <div className="rounded-xl border border-green-400/20 p-3 flex items-center gap-2"
@@ -741,7 +807,11 @@ export default function HomePage() {
               <div className="modal-sucesso">
                 <div className="sucesso-icone spinner">⟳</div>
                 <h2>Processando na blockchain...</h2>
-                <p>Confirme a transação na sua carteira e aguarde.</p>
+                {(itemParaComprar?.currency === 'USDC' || itemParaComprar?.currency === 'EURC') ? (
+                  <p>Confirme as <strong>2 transações</strong> na sua carteira: <em>Approve</em> e depois a transferência.</p>
+                ) : (
+                  <p>Confirme a transação na sua carteira e aguarde.</p>
+                )}
               </div>
             )}
 
