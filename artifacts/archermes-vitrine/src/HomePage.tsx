@@ -454,6 +454,7 @@ export default function HomePage() {
                           src={item.images[selectedImages[item.id] ?? 0]}
                           alt={item.itemName}
                           className="card-gallery-main"
+                          loading="lazy"
                         />
                       </div>
                       {item.images.length > 1 && (
@@ -467,7 +468,7 @@ export default function HomePage() {
                                 onClick={(e) => { e.stopPropagation(); setCardImage(item.id, idx); }}
                                 aria-label={`Imagem ${idx + 1}`}
                               >
-                                <img src={src} alt={`Miniatura ${idx + 1}`} />
+                                <img src={src} alt={`Miniatura ${idx + 1}`} loading="lazy" />
                               </button>
                             );
                           })}
