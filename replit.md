@@ -119,6 +119,12 @@ Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript 
 - Produtos Impulsionados: 4 premium cards with gold/purple neon borders, glow-pulse animation
 - StoreDashboard visual panel: preset banner gallery (4), preset avatar gallery (4), file upload dropzones with drag-and-drop, neon color picker
 
+**Image Hosting**:
+- `src/imageUploader.ts` — abstraction layer for image uploads
+- When `VITE_IMGBB_API_KEY` is set: images are uploaded to Imgbb CDN (free) and stored as permanent https:// URLs. Get a free key at imgbb.com.
+- Without the key: images fall back to base64 localStorage (per-browser, per-origin — images won't persist across different deployments/domains)
+- Must set `VITE_IMGBB_API_KEY` in both Replit Secrets AND Vercel env vars for cross-domain persistence
+
 **Notes**:
 - `STABLECOIN_ADDRESSES` are placeholders (0x000...001 / 0x000...002) until real contracts deploy
 - "Invalid hook call" in console is pre-existing Privy/Coinbase connector issue, not a bug

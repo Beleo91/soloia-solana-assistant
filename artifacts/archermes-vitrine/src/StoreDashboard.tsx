@@ -5,6 +5,7 @@ import { useLang } from './i18n';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import { saveStoreToRegistry, addBoostedProduct, getItemImages, getNeonShadow } from './registry';
+import { uploadImage } from './imageUploader';
 
 interface StoreInfo {
   storeName: string;
@@ -152,7 +153,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
     setConvertingBanner(true);
     try {
       const base64 = await fileToBase64(file);
-      salvarCustomizacao({ ...customizacao, bannerUrl: base64 });
+      const result = await uploadImage(base64);
+      salvarCustomizacao({ ...customizacao, bannerUrl: result.url });
     } finally {
       setConvertingBanner(false);
     }
@@ -162,7 +164,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
     setConvertingAvatar(true);
     try {
       const base64 = await fileToBase64(file);
-      salvarCustomizacao({ ...customizacao, avatarUrl: base64 });
+      const result = await uploadImage(base64);
+      salvarCustomizacao({ ...customizacao, avatarUrl: result.url });
     } finally {
       setConvertingAvatar(false);
     }

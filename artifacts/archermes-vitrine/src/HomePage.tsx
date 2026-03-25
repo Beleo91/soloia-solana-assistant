@@ -12,6 +12,7 @@ import {
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
+import { uploadImages } from './imageUploader';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -325,8 +326,9 @@ export default function HomePage() {
     setConvertingImages(true);
     try {
       const base64s = await Promise.all(newFiles.map(fileToBase64));
+      const urls = await uploadImages(base64s);
       setFormImages((prev) => [...prev, ...newFiles]);
-      setFormImagesBase64((prev) => [...prev, ...base64s]);
+      setFormImagesBase64((prev) => [...prev, ...urls]);
     } finally {
       setConvertingImages(false);
     }
