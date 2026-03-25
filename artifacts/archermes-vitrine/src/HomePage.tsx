@@ -16,7 +16,16 @@ interface ItemBlockchain {
   priceEth: string;
   category: string;
   seller: string;
+  images?: string[];
 }
+
+const MOCK_ITEM_IMAGES: Record<number, string[]> = {
+  1: [
+    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1608231387042-66d1773070a5?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=300&fit=crop',
+  ],
+};
 
 interface LojaVip {
   address: string;
@@ -96,6 +105,12 @@ export default function HomePage() {
   const [filtroCategoria, setFiltroCategoria] = useState('Todos');
   const carrosselRef = useRef<HTMLDivElement>(null);
 
+  const [selectedImages, setSelectedImages] = useState<Record<number, number>>({});
+
+  function setCardImage(itemId: number, idx: number) {
+    setSelectedImages((prev) => ({ ...prev, [itemId]: idx }));
+  }
+
   // Afiliado / Compra
   const [refAddress] = useState<string>(() => lerRefDaUrl());
   const [itemParaComprar, setItemParaComprar] = useState<ItemBlockchain | null>(null);
@@ -114,12 +129,14 @@ export default function HomePage() {
       for (let i = 1; i <= Number(total); i++) {
         const item = await contrato.items(i);
         if (!item.isSold && item.isActive) {
+          const id = Number(item.id);
           itens.push({
-            id: Number(item.id),
+            id,
             itemName: item.itemName,
             priceEth: formatUnits(item.price, 18),
             category: item.category,
             seller: item.seller,
+            images: MOCK_ITEM_IMAGES[id],
           });
         }
       }
@@ -430,9 +447,38 @@ export default function HomePage() {
                       ⚡ VIP
                     </span>
                   )}
-                  <div className={`card-placeholder ${isPro ? 'card-placeholder-pro' : ''}`}>
-                    <span className="card-placeholder-icon" style={isPro ? { filter: 'drop-shadow(0 0 8px rgba(251,191,36,0.5))' } : {}}>⬡</span>
-                  </div>
+                  {item.images && item.images.length > 0 ? (
+                    <div className="card-gallery">
+                      <div className="card-gallery-main-wrap">
+                        <img
+                          src={item.images[selectedImages[item.id] ?? 0]}
+                          alt={item.itemName}
+                          className="card-gallery-main"
+                        />
+                      </div>
+                      {item.images.length > 1 && (
+                        <div className="card-thumbnails">
+                          {item.images.map((src, idx) => {
+                            const isActive = (selectedImages[item.id] ?? 0) === idx;
+                            return (
+                              <button
+                                key={idx}
+                                className={`card-thumb ${isActive ? (isPro ? 'card-thumb-active-gold' : 'card-thumb-active') : ''}`}
+                                onClick={(e) => { e.stopPropagation(); setCardImage(item.id, idx); }}
+                                aria-label={`Imagem ${idx + 1}`}
+                              >
+                                <img src={src} alt={`Miniatura ${idx + 1}`} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`card-placeholder ${isPro ? 'card-placeholder-pro' : ''}`}>
+                      <span className="card-placeholder-icon" style={isPro ? { filter: 'drop-shadow(0 0 8px rgba(251,191,36,0.5))' } : {}}>⬡</span>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1 flex-1">
                     <h3 className="font-bold text-white leading-tight line-clamp-2"
                       style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.05em',
