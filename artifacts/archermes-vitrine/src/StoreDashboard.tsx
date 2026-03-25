@@ -167,6 +167,13 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
     } catch { setTxStatus((p) => ({ ...p, [id]: 'erro' })); }
   }
 
+  function handleExcluirItem(id: number) {
+    const confirmado = window.confirm('Tem certeza que deseja excluir este anúncio permanentemente?');
+    if (confirmado) {
+      setMeusProdutos((prev) => prev.filter((p) => p.id !== id));
+    }
+  }
+
   async function handleSetRastreio(id: number, code: string) {
     if (!code.trim()) return;
     const wallet = wallets[0]; if (!wallet) return;
@@ -549,6 +556,11 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         onClick={() => setRastreioId(rastreioId === prod.id ? null : prod.id)}
                         className="btn-neon btn-neon-cyan btn-neon-sm">
                         📦 Inserir Rastreio
+                      </button>
+                      <button
+                        onClick={() => handleExcluirItem(prod.id)}
+                        className="btn-neon btn-neon-sm btn-neon-delete">
+                        🗑 Excluir Anúncio
                       </button>
                     </div>
                   )}

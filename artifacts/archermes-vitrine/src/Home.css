@@ -488,6 +488,21 @@ body::after {
   box-shadow: 0 0 16px rgba(248,113,113,0.28), inset 0 0 8px rgba(248,113,113,0.06);
 }
 
+/* ── Delete / Destructive (red-600 neon) ── */
+.btn-neon-delete {
+  background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.5);
+  color: #ef4444;
+  text-shadow: 0 0 8px rgba(220,38,38,0.4);
+}
+.btn-neon-delete:hover {
+  background: rgba(220,38,38,0.16);
+  border-color: #dc2626;
+  color: #f87171;
+  box-shadow: 0 0 18px rgba(220,38,38,0.45), inset 0 0 10px rgba(220,38,38,0.08);
+  text-shadow: 0 0 12px rgba(220,38,38,0.6);
+}
+
 /* ── Twitter/X Blue ── */
 .btn-neon-twitter {
   background: rgba(29,161,242,0.09);
