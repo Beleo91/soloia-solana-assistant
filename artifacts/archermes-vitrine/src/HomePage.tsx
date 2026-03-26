@@ -6,7 +6,7 @@ import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import {
   STABLECOIN_ADDRESSES, STABLECOIN_META,
-  approveERC20, transferERC20, toTokenAmount,
+  transferERC20, toTokenAmount,
   formatStablecoinPrice, type StablecoinSymbol,
 } from './stablecoins';
 import StoreDashboard from './StoreDashboard';
@@ -16,6 +16,14 @@ import { uploadImages } from './imageUploader';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+/** Treasury / contract owner — mirrors the on-chain `owner()` return value. */
+const TREASURY_WALLET = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
+/** Must stay in sync with on-chain platformFeePercent (currently 3). */
+const PLATFORM_FEE_PERCENT = 3n;
+/** Must stay in sync with on-chain referralFeePercent (currently 1). */
+const REFERRAL_FEE_PERCENT = 1n;
+
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
 
 type Moeda = 'ETH' | StablecoinSymbol;
@@ -559,22 +567,38 @@ export default function HomePage() {
       if (!provider) { setBuyEstado('erro'); setBuyErro('Provedor de carteira não encontrado.'); return; }
       const signer = await provider.getSigner();
 
+      const referrer = refAddress !== ZERO_ADDRESS ? refAddress : ZERO_ADDRESS;
+
       if (currency === 'ETH') {
         const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
         const priceWei = parseUnits(itemParaComprar.priceEth, 18);
-        const referrer = refAddress !== ZERO_ADDRESS ? refAddress : ZERO_ADDRESS;
         const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: priceWei });
         await tx.wait();
         setBuyTx(tx.hash);
       } else {
         // ── ERC-20 flow (USDC / EURC) ──────────────────────────────────────────
+        // Fee distribution mirrors the on-chain logic for ETH purchases:
+        //   PLATFORM_FEE_PERCENT % → TREASURY_WALLET
+        //   REFERRAL_FEE_PERCENT % → referrer (if present)
+        //   remainder             → seller
         const tokenAddress = STABLECOIN_ADDRESSES[currency];
-        const amount = toTokenAmount(itemParaComprar.priceEth, currency);
-        // Step 1: approve the marketplace contract to spend the tokens
-        const approveTx = await approveERC20(signer, tokenAddress, CONTRACT_ADDRESS, amount);
-        await approveTx.wait();
-        // Step 2: direct transfer to seller (placeholder until contract supports ERC-20)
-        const transferTx = await transferERC20(signer, tokenAddress, itemParaComprar.seller, amount);
+        const totalAmount = toTokenAmount(itemParaComprar.priceEth, currency);
+        const platformFeeAmount = totalAmount * PLATFORM_FEE_PERCENT / 100n;
+        const referralFeeAmount = referrer !== ZERO_ADDRESS ? totalAmount * REFERRAL_FEE_PERCENT / 100n : 0n;
+        const sellerAmount = totalAmount - platformFeeAmount - referralFeeAmount;
+
+        // Step 1: platform fee → treasury
+        const feeTx = await transferERC20(signer, tokenAddress, TREASURY_WALLET, platformFeeAmount);
+        await feeTx.wait();
+
+        // Step 2: referral fee → referrer (if present)
+        if (referrer !== ZERO_ADDRESS && referralFeeAmount > 0n) {
+          const refTx = await transferERC20(signer, tokenAddress, referrer, referralFeeAmount);
+          await refTx.wait();
+        }
+
+        // Step 3: seller receives the remainder
+        const transferTx = await transferERC20(signer, tokenAddress, itemParaComprar.seller, sellerAmount);
         await transferTx.wait();
         setBuyTx(transferTx.hash);
       }
