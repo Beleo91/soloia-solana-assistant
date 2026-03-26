@@ -9,18 +9,20 @@ import { arcTestnet } from './chains';
 interface WalletCtx {
   address: string;
   isConnected: boolean;
+  isConnecting: boolean;
   provider: BrowserProvider | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   switchToArc: () => Promise<void>;
   getProvider: () => BrowserProvider | null;
   error: string;
+  clearError: () => void;
 }
 
 const Ctx = createContext<WalletCtx>({
-  address: '', isConnected: false, provider: null,
+  address: '', isConnected: false, isConnecting: false, provider: null,
   connect: async () => {}, disconnect: () => {}, switchToArc: async () => {},
-  getProvider: () => null, error: '',
+  getProvider: () => null, error: '', clearError: () => {},
 });
 
 const LS_ADDR = 'archermes_wallet_address';
@@ -43,8 +45,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   });
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [error, setError] = useState('');
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const isConnected = address.length > 0;
+
+  const clearError = useCallback(() => setError(''), []);
 
   // Silently reconnect on mount if previously connected
   useEffect(() => {
@@ -52,10 +57,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (!eth || !address) return;
     const prov = new BrowserProvider(eth);
     setProvider(prov);
-    // Verify account is still accessible
     eth.request({ method: 'eth_accounts' }).then((accounts) => {
       const accs = accounts as string[];
-      if (!accs.includes(address.toLowerCase()) && !accs.map(a => a.toLowerCase()).includes(address.toLowerCase())) {
+      const lower = address.toLowerCase();
+      const match = accs.find((a) => a.toLowerCase() === lower);
+      if (!match) {
         if (accs.length > 0) {
           const acc = accs[0];
           setAddress(acc);
@@ -67,9 +73,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
       }
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for account/chain changes
+  // Listen for account/chain changes from the wallet extension
   useEffect(() => {
     const eth = getEth();
     if (!eth) return;
@@ -121,34 +128,44 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const connect = useCallback(async () => {
     setError('');
+    setIsConnecting(true);
     const eth = getEth();
     if (!eth) {
-      setError('Nenhuma carteira Web3 detectada. Instale MetaMask ou Rabby.');
+      setError('NO_WALLET');
+      setIsConnecting(false);
       return;
     }
     try {
       const accounts = await eth.request({ method: 'eth_requestAccounts' }) as string[];
-      if (accounts.length === 0) { setError('Nenhuma conta autorizada.'); return; }
+      if (accounts.length === 0) {
+        setError('NO_ACCOUNTS');
+        setIsConnecting(false);
+        return;
+      }
       const acc = accounts[0];
       const prov = new BrowserProvider(eth);
       setAddress(acc);
       setProvider(prov);
       try { localStorage.setItem(LS_ADDR, acc); } catch { /* ignore */ }
+      // Switch/add Arc Testnet — errors here are non-fatal (user may dismiss)
       await switchToArc().catch(() => {});
     } catch (err) {
       const e = err as { code?: number; message?: string };
       if (e.code === 4001) {
-        setError('Conexão recusada pelo usuário.');
+        setError('CANCELLED');
       } else {
-        setError(e.message ?? 'Erro ao conectar carteira.');
+        setError(e.message ?? 'UNKNOWN');
       }
+    } finally {
+      setIsConnecting(false);
     }
   }, [switchToArc]);
 
   const disconnect = useCallback(() => {
-    // 1. Reset app state immediately
+    // 1. Reset app state immediately — UI reacts instantly
     setAddress('');
     setProvider(null);
+    setError('');
     try { localStorage.removeItem(LS_ADDR); } catch { /* ignore */ }
 
     // 2. Revoke wallet permissions (EIP-2255) so the next connect() prompts
@@ -156,7 +173,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const eth = getEth();
     if (eth) {
       eth.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] })
-        .catch(() => { /* wallet may not support EIP-2255 — safe to ignore */ });
+        .catch(() => { /* not all wallets support EIP-2255 — safe to ignore */ });
     }
 
     // 3. Clear the Privy session so the auth modal starts fresh on next login.
@@ -170,7 +187,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [provider]);
 
   return (
-    <Ctx.Provider value={{ address, isConnected, provider, connect, disconnect, switchToArc, getProvider, error }}>
+    <Ctx.Provider value={{
+      address, isConnected, isConnecting, provider,
+      connect, disconnect, switchToArc, getProvider,
+      error, clearError,
+    }}>
       {children}
     </Ctx.Provider>
   );

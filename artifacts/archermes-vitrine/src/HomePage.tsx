@@ -233,12 +233,34 @@ function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
 }
 
 export default function HomePage() {
-  const { connect, disconnect, isConnected, address: walletAddress, switchToArc, getProvider } = useWallet();
+  const { connect, disconnect, isConnected, isConnecting, address: walletAddress, switchToArc, getProvider, error: walletError, clearError: clearWalletError } = useWallet();
   const { t, lang, toggleLang } = useLang();
 
   const [pagina, setPagina] = useState<Pagina>('home');
   const [modalAberto, setModalAberto] = useState(false);
   const [estado, setEstado] = useState<Estado>('idle');
+
+  // ── TOAST ──
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => { setToast(''); clearWalletError(); }, 4000);
+  }
+
+  useEffect(() => {
+    if (!walletError) return;
+    const msgMap: Record<string, string> = {
+      CANCELLED: t('wallet.cancelled'),
+      NO_WALLET: t('wallet.noWallet'),
+      NO_ACCOUNTS: t('wallet.noAccounts'),
+    };
+    showToast(msgMap[walletError] ?? t('wallet.error'));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletError]);
+
   const [txHash, setTxHash] = useState('');
   const [erroMsg, setErroMsg] = useState('');
   const [form, setForm] = useState<FormData>({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
@@ -369,75 +391,104 @@ export default function HomePage() {
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
     setErroVitrine('');
+
+    const TIMEOUT_MS = 15_000;
+    function withTimeout<T>(p: Promise<T>): Promise<T> {
+      return Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('TIMEOUT')), TIMEOUT_MS)
+        ),
+      ]);
+    }
+
     try {
-      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-      const total: bigint = await contrato.totalItems();
-      const itens: ItemBlockchain[] = [];
-      for (let i = 1; i <= Number(total); i++) {
-        const item = await contrato.items(i);
-        if (!item.isSold && item.isActive) {
-          const id = Number(item.id);
+      const rpcProvider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpcProvider);
+
+      // Fetch total count with timeout
+      const total = Number(await withTimeout(contrato.totalItems() as Promise<bigint>));
+
+      // Fetch all items in parallel (not sequentially) — much faster
+      const ids = Array.from({ length: total }, (_, i) => i + 1);
+      const rawItems = await withTimeout(
+        Promise.all(ids.map((i) => (contrato.items(i) as Promise<unknown>).catch(() => null)))
+      );
+
+      const itens: ItemBlockchain[] = rawItems
+        .filter((item): item is NonNullable<typeof item> => {
+          if (!item) return false;
+          const it = item as { isSold?: boolean; isActive?: boolean };
+          return !it.isSold && !!it.isActive;
+        })
+        .map((item) => {
+          const it = item as { id: bigint; itemName: string; price: bigint; category: string; seller: string };
+          const id = Number(it.id);
           let images: string[] | undefined = MOCK_ITEM_IMAGES[id];
           try {
             const saved = localStorage.getItem(`archermes_item_images_${id}`);
             if (saved) images = JSON.parse(saved) as string[];
           } catch { /* ignore */ }
-          itens.push({
+          return {
             id,
-            itemName: item.itemName,
-            priceEth: formatUnits(item.price, 18),
-            category: item.category,
-            seller: item.seller,
+            itemName: it.itemName,
+            priceEth: formatUnits(it.price, 18),
+            category: it.category,
+            seller: it.seller,
             images,
             currency: MOCK_ITEM_CURRENCY[id] ?? 'ETH',
-          });
-        }
-      }
+          };
+        });
+
       setVitrine(itens);
 
+      // Fetch store info for all unique sellers in parallel
       const uniqueSellers = [...new Set(itens.map((i) => i.seller.toLowerCase()))];
       if (uniqueSellers.length > 0) {
-        const storeResults = await Promise.all(
-          uniqueSellers.map((addr) => contrato.stores(addr).catch(() => null))
+        const storeResults = await withTimeout(
+          Promise.all(uniqueSellers.map((addr) => (contrato.stores(addr) as Promise<unknown>).catch(() => null)))
         );
         const proSet = new Set<string>();
         const vipList: LojaVip[] = [];
         const registryEntries: RegistryStore[] = [];
         storeResults.forEach((s, idx) => {
-          if (!s || !s.storeName) return;
+          if (!s || !(s as { storeName?: string }).storeName) return;
+          const st = s as { storeName: string; tier: bigint; productCount: bigint };
           const addr = uniqueSellers[idx];
-          const tier = Number(s.tier);
+          const tier = Number(st.tier);
           if (tier === 1) {
             proSet.add(addr.toLowerCase());
-            vipList.push({ address: addr, storeName: s.storeName, productCount: Number(s.productCount), tier });
+            vipList.push({ address: addr, storeName: st.storeName, productCount: Number(st.productCount), tier });
           }
           let customizacao = { avatarUrl: '', bannerUrl: '', neonColor: '#00e5ff' };
           try {
             const raw = localStorage.getItem(`archermes_customizacao_${addr}`);
-            if (raw) customizacao = JSON.parse(raw);
+            if (raw) customizacao = JSON.parse(raw) as typeof customizacao;
           } catch { /* ignore */ }
           const entry: RegistryStore = {
             address: addr,
-            storeName: s.storeName,
+            storeName: st.storeName,
             avatarUrl: customizacao.avatarUrl,
             bannerUrl: customizacao.bannerUrl,
             neonColor: customizacao.neonColor,
             tier,
-            productCount: Number(s.productCount),
+            productCount: Number(st.productCount),
           };
           registryEntries.push(entry);
           saveStoreToRegistry(entry);
         });
         setSellersPro(proSet);
         setLojasVip(vipList);
-        if (registryEntries.length > 0) {
-          setLojasReais(getStoreRegistry());
-        }
+        if (registryEntries.length > 0) setLojasReais(getStoreRegistry());
       }
     } catch (err) {
-      console.error('Erro ao carregar vitrine:', err);
-      setErroVitrine('Não foi possível carregar os produtos.');
+      const e = err as Error;
+      console.error('Erro ao carregar vitrine:', e);
+      if (e.message === 'TIMEOUT') {
+        setErroVitrine('TIMEOUT');
+      } else {
+        setErroVitrine('ERROR');
+      }
     } finally {
       setCarregandoVitrine(false);
     }
@@ -562,6 +613,30 @@ export default function HomePage() {
 
   return (
     <div className="container-principal">
+
+      {/* ── TOAST ── */}
+      {toast && (
+        <div
+          role="alert"
+          onClick={() => { setToast(''); clearWalletError(); }}
+          style={{
+            position: 'fixed', top: '1.25rem', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 9999, cursor: 'pointer', maxWidth: '90vw',
+            background: 'rgba(10,10,18,0.96)',
+            border: '1px solid rgba(255,80,80,0.45)',
+            borderRadius: '0.5rem', padding: '0.65rem 1.1rem',
+            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            boxShadow: '0 0 18px rgba(255,80,80,0.2)',
+            fontFamily: "'Orbitron', sans-serif", fontSize: '0.72rem',
+            letterSpacing: '0.05em', color: '#ff8080',
+            animation: 'fadeIn 0.2s ease',
+          }}>
+          <span style={{ fontSize: '1rem' }}>⚠</span>
+          <span>{toast}</span>
+          <span style={{ marginLeft: '0.4rem', opacity: 0.4, fontSize: '0.65rem' }}>✕</span>
+        </div>
+      )}
+
       {/* ── HEADER ── */}
       <header className="cabecalho">
         <div className="logo-wrapper">
@@ -582,8 +657,20 @@ export default function HomePage() {
               {t('nav.affiliate')}
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStore')}</button>
-            <button onClick={() => void connect()} className="btn-entrar">{t('nav.connect')}</button>
-            <button onClick={() => void connect()} className="btn-login">{t('nav.createStore')}</button>
+            <button
+              onClick={() => { if (!isConnecting) void connect(); }}
+              disabled={isConnecting}
+              className="btn-entrar"
+              style={{ opacity: isConnecting ? 0.6 : 1 }}>
+              {isConnecting ? t('wallet.connecting') : t('nav.connect')}
+            </button>
+            <button
+              onClick={() => { if (!isConnecting) void connect(); }}
+              disabled={isConnecting}
+              className="btn-login"
+              style={{ opacity: isConnecting ? 0.6 : 1 }}>
+              {isConnecting ? t('wallet.connecting') : t('nav.createStore')}
+            </button>
           </div>
         ) : (
           <div className="painel-usuario">
@@ -868,8 +955,10 @@ export default function HomePage() {
         {!carregandoVitrine && erroVitrine && (
           <div className="flex flex-col items-center py-16 gap-3">
             <span className="text-3xl">⚠️</span>
-            <p className="text-red-400 text-sm">{erroVitrine}</p>
-            <button onClick={carregarVitrine} className="text-xs text-cyan-400 underline mt-1">{t('vitrine.retry')}</button>
+            <p className="text-red-400 text-sm">
+              {erroVitrine === 'TIMEOUT' ? t('vitrine.timeout') : t('vitrine.error')}
+            </p>
+            <button onClick={() => void carregarVitrine()} className="text-xs text-cyan-400 underline mt-1">{t('vitrine.retry')}</button>
           </div>
         )}
 

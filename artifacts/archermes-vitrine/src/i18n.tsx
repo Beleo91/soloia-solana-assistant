@@ -33,6 +33,8 @@ const translations = {
     'vitrine.refresh': '↻ Refresh',
     'vitrine.all': 'All',
     'vitrine.loading': 'Syncing with blockchain...',
+    'vitrine.timeout': 'Arc Testnet is taking too long to respond. Check your connection and try again.',
+    'vitrine.error': 'Could not load products.',
     'vitrine.retry': 'Try again',
     'vitrine.empty': 'No products found',
     'vitrine.addFirst': '+ List the first product',
@@ -197,6 +199,13 @@ const translations = {
     'cat.perfumes': 'Perfumes & Beauty',
     'cat.games': 'Games',
 
+    /* ── WALLET TOASTS ── */
+    'wallet.connecting': 'Connecting...',
+    'wallet.cancelled': 'Connection cancelled.',
+    'wallet.noWallet': 'No Web3 wallet detected. Install MetaMask or Rabby.',
+    'wallet.noAccounts': 'No account authorized.',
+    'wallet.error': 'Wallet connection error. Try again.',
+
     /* ── LANG TOGGLE ── */
     'lang.toggle': 'PT',
   },
@@ -229,6 +238,8 @@ const translations = {
     'vitrine.refresh': '↻ Atualizar',
     'vitrine.all': 'Todos',
     'vitrine.loading': 'Sincronizando com a blockchain...',
+    'vitrine.timeout': 'A Arc Testnet demorou demais para responder. Verifique sua conexão e tente novamente.',
+    'vitrine.error': 'Não foi possível carregar os produtos.',
     'vitrine.retry': 'Tentar novamente',
     'vitrine.empty': 'Nenhum produto encontrado',
     'vitrine.addFirst': '+ Anunciar o primeiro produto',
@@ -392,6 +403,13 @@ const translations = {
     'cat.electronics': 'Eletrônicos',
     'cat.perfumes': 'Perfumes e Beleza',
     'cat.games': 'Games',
+
+    /* ── WALLET TOASTS ── */
+    'wallet.connecting': 'Conectando...',
+    'wallet.cancelled': 'Conexão cancelada.',
+    'wallet.noWallet': 'Nenhuma carteira Web3 detectada. Instale MetaMask ou Rabby.',
+    'wallet.noAccounts': 'Nenhuma conta autorizada.',
+    'wallet.error': 'Erro ao conectar carteira. Tente novamente.',
 
     /* ── LANG TOGGLE ── */
     'lang.toggle': 'EN',
