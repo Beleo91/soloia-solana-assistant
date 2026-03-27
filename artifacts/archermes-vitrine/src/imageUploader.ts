@@ -70,3 +70,11 @@ export async function uploadImages(base64DataUrls: string[]): Promise<string[]> 
 
 export const isHostedUrl = (url: string): boolean =>
   url.startsWith('http://') || url.startsWith('https://');
+
+export const resolveImgUrl = (url: string): string => {
+  if (!url) return url;
+  if ((url.startsWith('/') && !url.startsWith('//')) && API_URL) {
+    return `${API_URL}${url}`;
+  }
+  return url;
+};

@@ -13,7 +13,7 @@ import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import StoreView, { type StoreItem } from './StoreView';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
-import { uploadImages } from './imageUploader';
+import { uploadImages, resolveImgUrl } from './imageUploader';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -338,6 +338,7 @@ export default function HomePage() {
   const carrosselRef = useRef<HTMLDivElement>(null);
 
   const [selectedImages, setSelectedImages] = useState<Record<number, number>>({});
+  const [itemImageErrors, setItemImageErrors] = useState<Record<number, boolean>>({});
 
   // Upload de imagens no modal
   const [formImages, setFormImages] = useState<File[]>([]);
@@ -407,6 +408,7 @@ export default function HomePage() {
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
     setErroVitrine('');
+    setItemImageErrors({});
 
     const TIMEOUT_MS = 15_000;
     function withTimeout<T>(p: Promise<T>): Promise<T> {
@@ -443,7 +445,11 @@ export default function HomePage() {
           let images: string[] | undefined = MOCK_ITEM_IMAGES[id];
           try {
             const saved = localStorage.getItem(`archermes_item_images_${id}`);
-            if (saved) images = JSON.parse(saved) as string[];
+            if (saved) {
+              const parsed = JSON.parse(saved) as string[];
+              images = parsed.map(resolveImgUrl).filter(Boolean);
+              if (images.length === 0) images = undefined;
+            }
           } catch { /* ignore */ }
           return {
             id,
@@ -1122,7 +1128,7 @@ export default function HomePage() {
                       ⚡ VIP
                     </span>
                   )}
-                  {item.images && item.images.length > 0 ? (
+                  {item.images && item.images.length > 0 && !itemImageErrors[item.id] ? (
                     <div className="card-gallery">
                       <div className="card-gallery-main-wrap">
                         <img
@@ -1130,6 +1136,7 @@ export default function HomePage() {
                           alt={item.itemName}
                           className="card-gallery-main"
                           loading="lazy"
+                          onError={() => setItemImageErrors((prev) => ({ ...prev, [item.id]: true }))}
                         />
                       </div>
                       {item.images.length > 1 && (

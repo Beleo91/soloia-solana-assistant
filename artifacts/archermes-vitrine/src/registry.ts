@@ -1,3 +1,5 @@
+import { resolveImgUrl } from './imageUploader';
+
 export const LS_STORE_REGISTRY = 'archermes_store_registry';
 export const LS_BOOSTED_PRODUCTS = 'archermes_boosted_products';
 
@@ -78,7 +80,10 @@ export function addBoostedProduct(prod: BoostedProduct): void {
 export function getItemImages(id: number): string[] {
   try {
     const raw = localStorage.getItem(`archermes_item_images_${id}`);
-    if (raw) return JSON.parse(raw) as string[];
+    if (raw) {
+      const parsed = JSON.parse(raw) as string[];
+      return parsed.map(resolveImgUrl).filter(Boolean);
+    }
   } catch { /* ignore */ }
   return [];
 }
