@@ -480,6 +480,7 @@ export default function HomePage() {
   type LeaderboardBuyer  = { address: string; buyCount: number };
   const [leaderboardSellers, setLeaderboardSellers] = useState<LeaderboardSeller[]>([]);
   const [leaderboardBuyers,  setLeaderboardBuyers]  = useState<LeaderboardBuyer[]>([]);
+  const [showLeaderboard,    setShowLeaderboard]    = useState(false);
 
   // Minhas Compras (histórico do comprador)
   const [showMinhasCompras, setShowMinhasCompras] = useState(false);
@@ -1288,42 +1289,55 @@ export default function HomePage() {
 
       {/* ── 🏆 TOP ARCHITECTS LEADERBOARD ── */}
       <section id="leaderboard" className="vitrine-container leaderboard-section">
-        {/* ── Banner-Botão "Campeões do Mercado" ── */}
-        <button
-          onClick={() => document.getElementById('leaderboard-data')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="champions-banner-btn"
-          style={{
-            display: 'block', width: '100%', padding: 0,
-            border: 'none', borderRadius: '1.25rem',
-            overflow: 'hidden', cursor: 'pointer', marginBottom: '2rem',
-            position: 'relative',
-            boxShadow: '0 0 40px rgba(251,191,36,0.12), 0 0 80px rgba(0,229,255,0.06), 0 8px 32px rgba(0,0,0,0.5)',
-            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-4px) scale(1.005)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 60px rgba(251,191,36,0.22), 0 0 120px rgba(0,229,255,0.1), 0 16px 48px rgba(0,0,0,0.6)';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0) scale(1)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 40px rgba(251,191,36,0.12), 0 0 80px rgba(0,229,255,0.06), 0 8px 32px rgba(0,0,0,0.5)';
-          }}>
-          <img
-            src="/champions-button-banner.png"
-            alt={lang === 'en' ? 'See Market Champions' : 'Veja os Campeões do Mercado'}
-            style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', borderRadius: '1.25rem' }}
-          />
-          {/* Hover overlay */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: '1.25rem',
-            border: '1.5px solid rgba(251,191,36,0.3)',
-            background: 'linear-gradient(135deg, rgba(251,191,36,0.04), rgba(0,229,255,0.04))',
-            pointerEvents: 'none',
-          }} />
-        </button>
+        {/* ── Botão compacto "Campeões do Mercado" ── */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+          <button
+            onClick={() => setShowLeaderboard(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.6rem',
+              padding: '0.65rem 1.5rem',
+              borderRadius: '999px',
+              border: '1.5px solid rgba(251,191,36,0.4)',
+              background: 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(0,229,255,0.06))',
+              backdropFilter: 'blur(12px)',
+              cursor: 'pointer',
+              color: '#fbbf24',
+              fontFamily: "'Orbitron', sans-serif",
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              boxShadow: showLeaderboard
+                ? '0 0 24px rgba(251,191,36,0.25), 0 0 48px rgba(0,229,255,0.1)'
+                : '0 0 12px rgba(251,191,36,0.1)',
+              transition: 'all 0.25s ease',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 28px rgba(251,191,36,0.3), 0 0 56px rgba(0,229,255,0.12)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(251,191,36,0.7)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = showLeaderboard ? '0 0 24px rgba(251,191,36,0.25), 0 0 48px rgba(0,229,255,0.1)' : '0 0 12px rgba(251,191,36,0.1)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(251,191,36,0.4)';
+            }}>
+            <span style={{ fontSize: '1rem', filter: 'drop-shadow(0 0 6px rgba(251,191,36,0.6))' }}>🏆</span>
+            <span>{lang === 'en' ? 'Market Champions' : 'Campeões do Mercado'}</span>
+            <span style={{
+              marginLeft: '0.2rem', fontSize: '0.6rem', opacity: 0.7,
+              transform: showLeaderboard ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.25s ease',
+              display: 'inline-block',
+            }}>▼</span>
+          </button>
+        </div>
 
-        {/* ── Dados do Leaderboard ── */}
-        <div id="leaderboard-data">
+        {/* ── Dados do Leaderboard (collapsível) ── */}
+        <div id="leaderboard-data" style={{
+          overflow: 'hidden',
+          maxHeight: showLeaderboard ? '800px' : '0px',
+          opacity: showLeaderboard ? 1 : 0,
+          transition: 'max-height 0.4s ease, opacity 0.3s ease',
+        }}>
           {(leaderboardSellers.length > 0 || leaderboardBuyers.length > 0) ? (
           <div className="leaderboard-panel">
             <div className="leaderboard-grid">
