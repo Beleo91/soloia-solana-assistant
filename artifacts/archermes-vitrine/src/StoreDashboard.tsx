@@ -438,7 +438,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   ] as const;
 
   return (
-    <div className="min-h-screen px-6 py-10 max-w-4xl mx-auto w-full">
+    <div style={{ minHeight: '100vh', padding: '2.5rem 1.5rem', maxWidth: '56rem', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
       {/* Voltar */}
       <button onClick={onVoltar}
         className="mb-8 text-xs text-white/40 hover:text-cyan-400 transition-colors flex items-center gap-2 tracking-widest uppercase"
