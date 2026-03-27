@@ -39,6 +39,15 @@ const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa'
 function extractContractError(err: unknown): string {
   if (!err) return 'Unknown error';
   const e = err as Record<string, unknown>;
+  // 0. ethers v6 CALL_EXCEPTION sem dados de revert ("missing revert data")
+  if (e.code === 'CALL_EXCEPTION') {
+    // Tenta extrair custom error ou revert reason dos dados
+    try {
+      const data = e.data as Record<string, unknown> | undefined;
+      if (data && typeof data.message === 'string' && data.message.length > 0) return data.message;
+    } catch { /* ignore */ }
+    return 'Transação rejeitada pelo contrato. Verifique se sua loja está ativa e com assinatura válida.';
+  }
   // 1. ethers v6: `reason` field contains the decoded revert string
   if (typeof e.reason === 'string' && e.reason.length > 0) return e.reason;
   // 2. viem shortMessage (clean one-liner)
@@ -73,6 +82,8 @@ function extractContractError(err: unknown): string {
     }
     if (m.toLowerCase().includes('execution reverted'))
       return 'Transação revertida pelo contrato. Verifique se sua loja está ativa e os dados estão corretos.';
+    if (m.toLowerCase().includes('missing revert data'))
+      return 'Transação rejeitada pelo contrato. Verifique se sua loja está ativa e com assinatura válida.';
     return m.length > 200 ? m.slice(0, 200) + '…' : m;
   }
   return String(err).slice(0, 200);
