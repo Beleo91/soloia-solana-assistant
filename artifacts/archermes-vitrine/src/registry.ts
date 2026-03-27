@@ -2,6 +2,7 @@ import { resolveImgUrl } from './imageUploader';
 
 export const LS_STORE_REGISTRY = 'archermes_store_registry';
 export const LS_BOOSTED_PRODUCTS = 'archermes_boosted_products';
+export const BOOST_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface RegistryStore {
   address: string;
@@ -63,7 +64,13 @@ export function saveStoreToRegistry(store: RegistryStore): void {
 export function getBoostedProducts(): BoostedProduct[] {
   try {
     const raw = localStorage.getItem(LS_BOOSTED_PRODUCTS);
-    if (raw) return JSON.parse(raw) as BoostedProduct[];
+    if (!raw) return [];
+    const all = JSON.parse(raw) as BoostedProduct[];
+    const active = all.filter((p) => Date.now() - p.boostedAt < BOOST_DURATION_MS);
+    if (active.length !== all.length) {
+      localStorage.setItem(LS_BOOSTED_PRODUCTS, JSON.stringify(active));
+    }
+    return active;
   } catch { /* ignore */ }
   return [];
 }

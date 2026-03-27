@@ -14,6 +14,7 @@ import AffiliateDashboard from './AffiliateDashboard';
 import StoreView, { type StoreItem } from './StoreView';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
 import { uploadImages, resolveImgUrl } from './imageUploader';
+import { useVitrineSync, broadcastVitrineEvent } from './vitrineSync';
 import './Home.css';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -532,6 +533,18 @@ export default function HomePage() {
 
   useEffect(() => { carregarVitrine(); }, [carregarVitrine]);
 
+  // Sync em tempo real: blockchain events + BroadcastChannel entre abas
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useVitrineSync((event) => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = setTimeout(() => {
+      carregarDadosLocais();
+      if (event.type !== 'profile:updated') {
+        void carregarVitrine();
+      }
+    }, 800);
+  });
+
   // Auto-abrir modal de compra quando URL contém ?item=ID
   useEffect(() => {
     if (!itemDaUrl || vitrine.length === 0) return;
@@ -576,6 +589,7 @@ export default function HomePage() {
       setTxHash(tx.hash);
       setEstado('sucesso');
       carregarVitrine();
+      broadcastVitrineEvent({ type: 'product:listed', id: 0 });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErroMsg(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);

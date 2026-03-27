@@ -7,6 +7,7 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import { saveStoreToRegistry, addBoostedProduct, getItemImages, getNeonShadow } from './registry';
 import { uploadImage } from './imageUploader';
 import { transferERC20, STABLECOIN_ADDRESSES, toTokenAmount } from './stablecoins';
+import { broadcastVitrineEvent } from './vitrineSync';
 
 const TREASURY_WALLET = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
 const BOOST_PRICE_USDC = '5';
@@ -130,6 +131,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
         tier: loja.tier,
         productCount: Number(loja.productCount),
       });
+      broadcastVitrineEvent({ type: 'profile:updated', address: enderecoUsuario });
     }
   }
 
@@ -336,6 +338,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
         boostedAt: Date.now(),
       });
       setMeusProdutos((prev) => prev.map((p) => p.id === prod.id ? { ...p, isBoosted: true } : p));
+      broadcastVitrineEvent({ type: 'boost:changed' });
       setBoostEstado('sucesso');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
