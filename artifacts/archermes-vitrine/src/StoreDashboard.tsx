@@ -26,6 +26,7 @@ interface MeuProduto {
   category: string;
   isActive: boolean;
   isSold: boolean;
+  stock: bigint;
   imageUrl?: string;
   isBoosted?: boolean;
 }
@@ -245,6 +246,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
             category: item.category,
             isActive: item.isActive,
             isSold: item.isSold,
+            stock: BigInt(item.stock ?? 0),
             imageUrl: imgs[0],
             isBoosted,
           });
@@ -291,21 +293,44 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       const tx = await contrato.cancelItem(id);
       await tx.wait();
       setTxStatus((p) => ({ ...p, [id]: 'cancelado' }));
-      carregarMeusProdutos();
+      // Broadcast so the vitrine and other tabs remove the item immediately
+      broadcastVitrineEvent({ type: 'product:cancelled', id });
+      // Delay reload to give Arc Testnet RPC time to propagate
+      setTimeout(() => carregarMeusProdutos(), 2000);
     } catch { setTxStatus((p) => ({ ...p, [id]: 'erro' })); }
   }
 
-  function handleExcluirItem(id: number) {
+  async function handleExcluirItem(id: number) {
     const confirmado = window.confirm('Tem certeza que deseja excluir este anúncio permanentemente?');
-    if (confirmado) {
-      const next = new Set(deletedIds);
-      next.add(id);
-      setDeletedIds(next);
-      setMeusProdutos((prev) => prev.filter((p) => p.id !== id));
+    if (!confirmado) return;
+
+    // 1. Cancel on-chain first (so the vitrine immediately hides the product)
+    if (isConnected) {
+      setTxStatus((p) => ({ ...p, [id]: 'cancelando' }));
       try {
-        localStorage.setItem(`${LS_DELETED_KEY}_${enderecoUsuario}`, JSON.stringify([...next]));
-      } catch { /* ignore */ }
+        await switchToArc();
+        const provider = getProvider();
+        if (provider) {
+          const signer = await provider.getSigner();
+          const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+          const tx = await contrato.cancelItem(id);
+          await tx.wait();
+          broadcastVitrineEvent({ type: 'product:cancelled', id });
+        }
+      } catch {
+        // If on-chain cancel fails (e.g. already sold), proceed with UI removal anyway
+      }
     }
+
+    // 2. Remove from local dashboard state
+    const next = new Set(deletedIds);
+    next.add(id);
+    setDeletedIds(next);
+    setMeusProdutos((prev) => prev.filter((p) => p.id !== id));
+    try {
+      localStorage.setItem(`${LS_DELETED_KEY}_${enderecoUsuario}`, JSON.stringify([...next]));
+    } catch { /* ignore */ }
+    setTxStatus((p) => { const s = { ...p }; delete s[id]; return s; });
   }
 
   async function handleBoost(prod: MeuProduto) {
@@ -729,6 +754,12 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         {prod.isActive && !prod.isSold && (
                           <span className="text-[9px] font-bold tracking-widest bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full"
                             style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.active')}</span>
+                        )}
+                        {prod.stock !== undefined && prod.isActive && (
+                          <span className="text-[9px] font-bold tracking-widest bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-full"
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                            {lang === 'en' ? 'STOCK' : 'ESTOQUE'}: {prod.stock.toString()}
+                          </span>
                         )}
                       </div>
                       <h4 className="font-bold text-sm text-white leading-tight"

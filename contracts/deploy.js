@@ -29,7 +29,8 @@ if (!PRIVATE_KEY) {
 }
 
 const abi      = JSON.parse(readFileSync(path.join(OUT, 'Archermes.abi.json'), 'utf8'));
-const bytecode = '0x' + readFileSync(path.join(OUT, 'Archermes.bin'), 'utf8').trim();
+// Archermes.bin already includes the 0x prefix from compile.cjs
+const bytecode = readFileSync(path.join(OUT, 'Archermes.bin'), 'utf8').trim();
 
 const provider = new ethers.JsonRpcProvider(RPC_URL, CHAIN_ID);
 const wallet   = new ethers.Wallet(PRIVATE_KEY, provider);

@@ -69,6 +69,19 @@
         "internalType": "uint256",
         "name": "id",
         "type": "uint256"
+      }
+    ],
+    "name": "ItemCancelled",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
       },
       {
         "indexed": false,
@@ -319,6 +332,11 @@
         "internalType": "bool",
         "name": "isActive",
         "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "stock",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -340,6 +358,11 @@
         "internalType": "string",
         "name": "_category",
         "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_stock",
+        "type": "uint256"
       }
     ],
     "name": "listItem",

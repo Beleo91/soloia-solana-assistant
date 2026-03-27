@@ -2,13 +2,13 @@
 pragma solidity ^0.8.20;
 
 /**
- * ARCHERMES Marketplace — v2
- * Fixes:
- *  1. Admin (owner) bypasses all product-count limits in listItem.
- *  2. Admin (owner) bypasses the "cannot buy own item" guard in buyItem.
- *  3. Platform-fee self-transfer skipped when buyer == owner (treasury).
- *  4. Free-tier hard limit raised to 10 (was 5 in v1).
- *  5. Admin pays zero store fees (createStore / renewStore / upgradeToPro).
+ * ARCHERMES Marketplace — v3
+ * Changes vs v2:
+ *  1. Item struct gains `uint256 stock` — quantity of units available.
+ *  2. listItem() requires _stock >= 1.
+ *  3. buyItem() requires stock > 0 and decrements it; when stock reaches 0
+ *     the item becomes inactive (sold out).
+ *  4. cancelItem() emits ItemCancelled event so the vitrine syncs in real time.
  */
 contract Archermes {
     address payable public owner;
@@ -37,22 +37,24 @@ contract Archermes {
         bool            isDelivered;
         bool            isRefunded;
         bool            isActive;
+        uint256         stock;
     }
 
     struct Store {
         string   storeName;
         uint256  expiresAt;
-        uint8    tier;          // 0 = free, 1 = pro
+        uint8    tier;
         uint256  productCount;
     }
 
-    mapping(uint256 => Item)  public items;
-    mapping(address => Store) public stores;
-    mapping(uint256 => uint256) private escrow; // itemId → escrowed ETH
+    mapping(uint256 => Item)    public items;
+    mapping(address => Store)   public stores;
+    mapping(uint256 => uint256) private escrow;
 
     // ── Events ──────────────────────────────────────────────────────────────
     event ItemListed(uint256 indexed id, string itemName, uint256 price, address indexed seller);
     event ItemBought(uint256 indexed id, address indexed buyer);
+    event ItemCancelled(uint256 indexed id);
     event DeliveryConfirmed(uint256 indexed id, address liberadoPor);
     event RefundIssued(uint256 indexed id);
     event ItemBanned(uint256 indexed id);
@@ -61,12 +63,10 @@ contract Archermes {
     event TrackingAdded(uint256 indexed id, string trackingCode);
 
     // ── Modifiers ────────────────────────────────────────────────────────────
-    modifier onlyOwner()  { require(msg.sender == owner,  "Not owner");           _; }
-    modifier notPaused()  { require(!paused,              "Contract paused");     _; }
+    modifier onlyOwner()  { require(msg.sender == owner,  "Not owner");       _; }
+    modifier notPaused()  { require(!paused,              "Contract paused"); _; }
 
     // ── Constructor ──────────────────────────────────────────────────────────
-    // _admin is the permanent marketplace owner/treasury (0x434189487484F20B9Bf0e0c28C1559B0c961274B).
-    // The deployer wallet just pays gas — ownership is set to _admin from block 0.
     constructor(address payable _admin) {
         require(_admin != address(0), "Invalid admin address");
         owner = _admin;
@@ -94,7 +94,6 @@ contract Archermes {
             if (fee > 0) owner.transfer(fee);
             if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
         } else {
-            // Admin: refund any accidentally sent ETH
             if (msg.value > 0) payable(msg.sender).transfer(msg.value);
         }
         stores[msg.sender] = Store({
@@ -146,13 +145,14 @@ contract Archermes {
     function listItem(
         string calldata _itemName,
         uint256 _price,
-        string calldata _category
+        string calldata _category,
+        uint256 _stock
     ) external notPaused {
+        require(_stock > 0, "Stock must be at least 1");
         Store storage s = stores[msg.sender];
         require(bytes(s.storeName).length > 0, "No store registered");
-        require(s.expiresAt >= block.timestamp,  "Store subscription expired");
+        require(s.expiresAt >= block.timestamp, "Store subscription expired");
 
-        // Admin has no product limit; free-tier capped at FREE_TIER_LIMIT
         if (msg.sender != owner && s.tier == 0) {
             require(s.productCount < FREE_TIER_LIMIT, "Free tier limit: max 10 products");
         }
@@ -170,7 +170,8 @@ contract Archermes {
             isSold:       false,
             isDelivered:  false,
             isRefunded:   false,
-            isActive:     true
+            isActive:     true,
+            stock:        _stock
         });
         s.productCount++;
         emit ItemListed(totalItems, _itemName, _price, msg.sender);
@@ -179,12 +180,11 @@ contract Archermes {
     // ── Purchase (ETH escrow) ─────────────────────────────────────────────────
     function buyItem(uint256 _id, address payable _referrer) external payable notPaused {
         Item storage item = items[_id];
-        require(item.isActive, "Item not active");
-        require(!item.isSold,  "Already sold");
+        require(item.isActive,      "Item not active");
+        require(!item.isSold,       "Already sold");
+        require(item.stock > 0,     "Produto esgotado");
         require(msg.value >= item.price, "Insufficient payment");
 
-        // Admin can buy any item (including own listings) for testing.
-        // Regular users may not purchase their own items.
         if (msg.sender != owner) {
             require(msg.sender != item.seller, "Cannot buy own item");
         }
@@ -196,32 +196,29 @@ contract Archermes {
             _referrer != item.seller &&
             _referrer != msg.sender
         );
-        uint256 refFee  = validRef ? (item.price * referralFeePercent) / 100 : 0;
+        uint256 refFee   = validRef ? (item.price * referralFeePercent) / 100 : 0;
         uint256 escrowed = item.price - platFee - refFee;
 
-        // Platform fee → treasury (owner).
-        // Skip self-transfer when buyer IS the owner to avoid pointless round-trip.
         if (msg.sender != owner && platFee > 0) {
             owner.transfer(platFee);
         }
-
-        // Referral fee
         if (refFee > 0 && validRef) {
             _referrer.transfer(refFee);
         }
-
-        // Refund excess ETH sent by buyer
         if (msg.value > item.price) {
             payable(msg.sender).transfer(msg.value - item.price);
         }
 
-        // Park seller amount in escrow until delivery confirmed
         escrow[_id] = escrowed;
 
-        item.isSold    = true;
-        item.isActive  = false;
-        item.buyer     = payable(msg.sender);
-        item.referrer  = _referrer;
+        // Decrement stock; mark sold out when stock reaches 0
+        item.stock--;
+        if (item.stock == 0) {
+            item.isSold   = true;
+            item.isActive = false;
+        }
+        item.buyer    = payable(msg.sender);
+        item.referrer = _referrer;
 
         emit ItemBought(_id, msg.sender);
     }
@@ -259,6 +256,7 @@ contract Archermes {
         require(!item.isSold, "Already sold");
         require(msg.sender == item.seller || msg.sender == owner, "Not seller or admin");
         item.isActive = false;
+        emit ItemCancelled(_id);
     }
 
     function banItem(uint256 _id) external onlyOwner {

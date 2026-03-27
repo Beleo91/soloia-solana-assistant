@@ -7,13 +7,14 @@ const CHANNEL_NAME = 'archermes:vitrine:sync';
 const POLL_INTERVAL_MS = 6_000;
 
 export type SyncEvent =
-  | { type: 'product:listed'; id: number }
-  | { type: 'product:sold'; id: number }
-  | { type: 'product:banned'; id: number }
-  | { type: 'store:created'; address: string }
-  | { type: 'store:upgraded'; address: string }
+  | { type: 'product:listed';    id: number }
+  | { type: 'product:sold';      id: number }
+  | { type: 'product:banned';    id: number }
+  | { type: 'product:cancelled'; id: number }
+  | { type: 'store:created';     address: string }
+  | { type: 'store:upgraded';    address: string }
   | { type: 'boost:changed' }
-  | { type: 'profile:updated'; address: string };
+  | { type: 'profile:updated';   address: string };
 
 export const BOOST_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -86,6 +87,9 @@ export function useVitrineSync(onEvent: (event: SyncEvent) => void): void {
                 break;
               case 'ItemBanned':
                 event = { type: 'product:banned', id: Number(parsed.args[0] as bigint) };
+                break;
+              case 'ItemCancelled':
+                event = { type: 'product:cancelled', id: Number(parsed.args[0] as bigint) };
                 break;
               case 'StoreCreated':
                 event = { type: 'store:created', address: parsed.args[0] as string };

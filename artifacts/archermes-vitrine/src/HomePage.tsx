@@ -76,6 +76,7 @@ interface ItemBlockchain {
   seller: string;
   images?: string[];
   currency?: Moeda;
+  stock?: bigint;
 }
 
 interface ItemComprado {
@@ -409,6 +410,7 @@ export default function HomePage() {
   const [formImages, setFormImages] = useState<File[]>([]);
   const [formImagesBase64, setFormImagesBase64] = useState<string[]>([]);
   const [convertingImages, setConvertingImages] = useState(false);
+  const [formEstoque, setFormEstoque] = useState<number>(1);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -524,11 +526,15 @@ export default function HomePage() {
       const itens: ItemBlockchain[] = rawItems
         .filter((item): item is NonNullable<typeof item> => {
           if (!item) return false;
-          const it = item as { isSold?: boolean; isActive?: boolean };
-          return !it.isSold && !!it.isActive;
+          const it = item as { isSold?: boolean; isActive?: boolean; stock?: bigint };
+          // Keep only active, non-sold items.
+          // stock is optional for backward compat with v1/v2 contract (no stock field).
+          if (!!it.isSold || !it.isActive) return false;
+          if (it.stock !== undefined && it.stock <= 0n) return false;
+          return true;
         })
         .map((item) => {
-          const it = item as { id: bigint; itemName: string; price: bigint; category: string; seller: string };
+          const it = item as { id: bigint; itemName: string; price: bigint; category: string; seller: string; stock?: bigint };
           const id = Number(it.id);
           let images: string[] | undefined = MOCK_ITEM_IMAGES[id];
           try {
@@ -547,6 +553,7 @@ export default function HomePage() {
             seller: it.seller,
             images,
             currency: MOCK_ITEM_CURRENCY[id] ?? 'ETH',
+            stock: it.stock,
           };
         });
 
@@ -613,6 +620,10 @@ export default function HomePage() {
     syncDebounceRef.current = setTimeout(() => {
       carregarDadosLocais();
       if (event.type !== 'profile:updated') {
+        // product:cancelled — remove immediately from local state, then reload from chain
+        if (event.type === 'product:cancelled') {
+          setVitrine((prev) => prev.filter((i) => i.id !== event.id));
+        }
         void carregarVitrine();
       }
     }, 800);
@@ -693,9 +704,10 @@ export default function HomePage() {
     setEstado('idle'); setTxHash(''); setErroMsg('');
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
     setFormImages([]); setFormImagesBase64([]);
+    setFormEstoque(1);
     setModalAberto(true);
   }
-  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); }
+  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); setFormEstoque(1); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -721,7 +733,8 @@ export default function HomePage() {
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const precoWei = parseUnits(form.preco, 18);
-      const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria);
+      const estoque = BigInt(Math.max(1, formEstoque));
+      const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria, estoque);
       await tx.wait();
       // Persist hosted image URLs for this new listing.
       // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded
@@ -1542,12 +1555,22 @@ export default function HomePage() {
                       <>{lang === 'en' ? '🔗 Affiliate Link' : '🔗 Link de Afiliado'}</>
                     )}
                   </button>
-                  <button
-                    className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
-                    onClick={() => abrirCompra(item)}
-                  >
-                    {isConnected ? t('vitrine.buyNow') : t('vitrine.connectToBuy')}
-                  </button>
+                  {item.stock !== undefined && item.stock <= 0n ? (
+                    <button
+                      className="btn-neon btn-neon-full"
+                      disabled
+                      style={{ opacity: 0.45, cursor: 'not-allowed', letterSpacing: '0.12em' }}
+                    >
+                      {lang === 'en' ? '⛔ OUT OF STOCK' : '⛔ ESGOTADO'}
+                    </button>
+                  ) : (
+                    <button
+                      className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
+                      onClick={() => abrirCompra(item)}
+                    >
+                      {isConnected ? t('vitrine.buyNow') : t('vitrine.connectToBuy')}
+                    </button>
+                  )}
                 </div>
               );
 
@@ -1616,6 +1639,19 @@ export default function HomePage() {
                         padding: '0.65rem 1rem', width: '100%', fontSize: '0.9rem', outline: 'none' }}>
                       {CATEGORIAS.map((c) => <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>)}
                     </select>
+                  </div>
+                  {/* Estoque */}
+                  <div className="campo">
+                    <label>{lang === 'en' ? 'Stock Quantity' : 'Quantidade em Estoque'} *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      required
+                      value={formEstoque}
+                      onChange={(e) => setFormEstoque(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      placeholder={lang === 'en' ? 'How many units do you have?' : 'Quantas unidades você tem?'}
+                    />
                   </div>
                   {/* Upload de imagens */}
                   <div className="campo">
