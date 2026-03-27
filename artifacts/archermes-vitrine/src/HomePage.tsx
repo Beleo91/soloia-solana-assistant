@@ -28,6 +28,44 @@ const REFERRAL_FEE_PERCENT = 1n;
 
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
 
+/**
+ * Extracts the most meaningful error message from an ethers.js / MetaMask error.
+ * Handles:
+ *  - Contract revert reasons  (error.reason)
+ *  - MetaMask JSON-RPC errors (error.info.error.message)
+ *  - eth_estimateGas reverts  (error.data.message)
+ *  - Standard Error objects
+ */
+function extractContractError(err: unknown): string {
+  if (!err) return 'Unknown error';
+  const e = err as Record<string, unknown>;
+  // 1. ethers v6 shortcircuit: `reason` field contains the decoded revert string
+  if (typeof e.reason === 'string' && e.reason.length > 0) return e.reason;
+  // 2. MetaMask wraps the original RPC error inside `info.error`
+  try {
+    const info = e.info as Record<string, unknown> | undefined;
+    if (info) {
+      const inner = info.error as Record<string, unknown> | undefined;
+      if (inner && typeof inner.message === 'string') return inner.message;
+      if (typeof info.message === 'string') return info.message;
+    }
+  } catch { /* ignore */ }
+  // 3. `data.message` sometimes carries the revert reason
+  try {
+    const data = e.data as Record<string, unknown> | undefined;
+    if (data && typeof data.message === 'string') return data.message;
+  } catch { /* ignore */ }
+  // 4. Standard JS Error
+  if (err instanceof Error) {
+    const m = err.message;
+    // Trim ethers boilerplate prefix if present
+    const rMatch = m.match(/reason="([^"]+)"/);
+    if (rMatch) return rMatch[1];
+    return m.length > 200 ? m.slice(0, 200) + '…' : m;
+  }
+  return String(err).slice(0, 200);
+}
+
 type Moeda = 'ETH' | StablecoinSymbol;
 
 interface ItemBlockchain {
@@ -707,8 +745,7 @@ export default function HomePage() {
       setTimeout(reloadAndBroadcast, 2000);
       setTimeout(() => carregarVitrine(), 6000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErroMsg(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);
+      setErroMsg(extractContractError(err));
       setEstado('erro');
     }
   }
@@ -772,8 +809,7 @@ export default function HomePage() {
       setBuyEstado('sucesso');
       carregarVitrine();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setBuyErro(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);
+      setBuyErro(extractContractError(err));
       setBuyEstado('erro');
     }
   }
