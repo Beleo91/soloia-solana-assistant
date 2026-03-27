@@ -661,6 +661,8 @@ export default function HomePage() {
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
+    // Auto-clear error so the user can retry without closing the modal
+    if (estado === 'erro') { setEstado('idle'); setErroMsg(''); }
   }
 
   async function handlePublicar(e: React.FormEvent) {
@@ -1626,7 +1628,20 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {estado === 'erro' && <div className="modal-erro">⚠️ {erroMsg}</div>}
+                  {estado === 'erro' && (
+                    <div className="modal-erro" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span>⚠️ {erroMsg}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setEstado('idle'); setErroMsg(''); }}
+                        style={{ background: 'none', border: 'none', color: '#00e5ff', cursor: 'pointer',
+                          fontSize: '0.75rem', textDecoration: 'underline', textAlign: 'center',
+                          fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.06em' }}
+                      >
+                        {lang === 'en' ? '← Try Again' : '← Tentar Novamente'}
+                      </button>
+                    </div>
+                  )}
                   <button type="submit" className="btn-publicar">{t('modal.list.publish')}</button>
                 </form>
               </>
