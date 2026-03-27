@@ -446,8 +446,6 @@ export default function HomePage() {
     setCarregandoVitrine(true);
     setErroVitrine('');
     setItemImageErrors({});
-    // Seed localStorage with hosted image URLs from the API server so ALL clients see images
-    await syncImageMapToStorage();
 
     const TIMEOUT_MS = 15_000;
     function withTimeout<T>(p: Promise<T>): Promise<T> {
@@ -459,12 +457,25 @@ export default function HomePage() {
       ]);
     }
 
+    // Start image-map sync in parallel with blockchain fetch so neither blocks the other.
+    // Give it at most 5 s — missing images is non-fatal.
+    const imageSyncDone = Promise.race([
+      syncImageMapToStorage(),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+    ]);
+
     try {
       const rpcProvider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpcProvider);
 
-      // Fetch total count with timeout
-      const total = Number(await withTimeout(contrato.totalItems() as Promise<bigint>));
+      // Fetch total count AND wait for image-map sync together so localStorage is
+      // ready by the time we map the items array.
+      const [total] = await withTimeout(
+        Promise.all([
+          (contrato.totalItems() as Promise<bigint>).then(Number),
+          imageSyncDone,
+        ])
+      ) as [number, boolean];
 
       // Fetch all items in parallel (not sequentially) — much faster
       const ids = Array.from({ length: total }, (_, i) => i + 1);
@@ -684,8 +695,15 @@ export default function HomePage() {
       }
       setTxHash(tx.hash);
       setEstado('sucesso');
-      carregarVitrine();
-      broadcastVitrineEvent({ type: 'product:listed', id: 0 });
+      // Arc Testnet RPC nodes can take 1-3 s to propagate a new block to eth_call.
+      // Fire a first reload after 2 s so the new product appears automatically,
+      // and a safety retry at 6 s in case of slower nodes.
+      const reloadAndBroadcast = () => {
+        carregarVitrine();
+        broadcastVitrineEvent({ type: 'product:listed', id: 0 });
+      };
+      setTimeout(reloadAndBroadcast, 2000);
+      setTimeout(() => carregarVitrine(), 6000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErroMsg(msg.length > 140 ? msg.slice(0, 140) + '…' : msg);
@@ -1628,6 +1646,11 @@ export default function HomePage() {
                 <h2>{t('modal.list.success')}</h2>
                 <p><strong>{form.nomeItem}</strong> {t('modal.list.successDesc')}</p>
                 {txHash && <p className="contrato-info">TX: <code>{txHash.slice(0,12)}…{txHash.slice(-6)}</code></p>}
+                <div className="flex items-center justify-center gap-2 mt-1 mb-1"
+                  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em' }}>
+                  <div className="w-3 h-3 rounded-full border border-cyan-400 border-t-transparent animate-spin" />
+                  {lang === 'en' ? 'Updating vitrine…' : 'Atualizando vitrine…'}
+                </div>
                 <button onClick={fecharModal} className="btn-publicar">{t('modal.list.close')}</button>
               </div>
             )}
