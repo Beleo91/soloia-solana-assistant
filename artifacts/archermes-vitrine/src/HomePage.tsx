@@ -1287,24 +1287,44 @@ export default function HomePage() {
       </section>
 
       {/* ── 🏆 TOP ARCHITECTS LEADERBOARD ── */}
-      {(leaderboardSellers.length > 0 || leaderboardBuyers.length > 0) && (
-        <section className="vitrine-container leaderboard-section">
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-5">
-            <span style={{ fontSize: '1.3rem', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.7))' }}>🏆</span>
-            <div>
-              <h2 className="text-xl font-black tracking-widest uppercase"
-                style={{ fontFamily: "'Orbitron', sans-serif",
-                  background: 'linear-gradient(90deg,#fbbf24,#00e5ff)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                {lang === 'en' ? 'Top Architects of the Week' : 'Top Architects da Semana'}
-              </h2>
-              <p className="text-white/25 text-xs tracking-wide mt-0.5">
-                {lang === 'en' ? 'Ranked by on-chain activity' : 'Ranqueado por atividade on-chain'}
-              </p>
-            </div>
-          </div>
+      <section id="leaderboard" className="vitrine-container leaderboard-section">
+        {/* ── Banner-Botão "Campeões do Mercado" ── */}
+        <button
+          onClick={() => document.getElementById('leaderboard-data')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="champions-banner-btn"
+          style={{
+            display: 'block', width: '100%', padding: 0,
+            border: 'none', borderRadius: '1.25rem',
+            overflow: 'hidden', cursor: 'pointer', marginBottom: '2rem',
+            position: 'relative',
+            boxShadow: '0 0 40px rgba(251,191,36,0.12), 0 0 80px rgba(0,229,255,0.06), 0 8px 32px rgba(0,0,0,0.5)',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-4px) scale(1.005)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 60px rgba(251,191,36,0.22), 0 0 120px rgba(0,229,255,0.1), 0 16px 48px rgba(0,0,0,0.6)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0) scale(1)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 40px rgba(251,191,36,0.12), 0 0 80px rgba(0,229,255,0.06), 0 8px 32px rgba(0,0,0,0.5)';
+          }}>
+          <img
+            src="/champions-button-banner.png"
+            alt={lang === 'en' ? 'See Market Champions' : 'Veja os Campeões do Mercado'}
+            style={{ width: '100%', display: 'block', aspectRatio: '16/9', objectFit: 'cover', borderRadius: '1.25rem' }}
+          />
+          {/* Hover overlay */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: '1.25rem',
+            border: '1.5px solid rgba(251,191,36,0.3)',
+            background: 'linear-gradient(135deg, rgba(251,191,36,0.04), rgba(0,229,255,0.04))',
+            pointerEvents: 'none',
+          }} />
+        </button>
 
+        {/* ── Dados do Leaderboard ── */}
+        <div id="leaderboard-data">
+          {(leaderboardSellers.length > 0 || leaderboardBuyers.length > 0) ? (
           <div className="leaderboard-panel">
             <div className="leaderboard-grid">
               {/* ── Top Vendedores ── */}
@@ -1383,9 +1403,24 @@ export default function HomePage() {
               )}
             </div>
           </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
-        </section>
-      )}
+          ) : (
+            /* Placeholder: ainda sem dados on-chain */
+            <div className="leaderboard-panel" style={{ textAlign: 'center', padding: '2.5rem 2rem' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', filter: 'drop-shadow(0 0 12px rgba(251,191,36,0.4))' }}>🏆</div>
+              <p style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.72rem', letterSpacing: '0.14em',
+                color: '#fbbf24', fontWeight: 700, marginBottom: '0.5rem' }}>
+                {lang === 'en' ? 'NO CHAMPIONS YET' : 'NENHUM CAMPEÃO AINDA'}
+              </p>
+              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)', lineHeight: 1.6, maxWidth: '28rem', margin: '0 auto' }}>
+                {lang === 'en'
+                  ? 'The first to buy or sell on ARCHERMES will claim the throne. The leaderboard updates live from the blockchain.'
+                  : 'Os primeiros a comprar ou vender na ARCHERMES reivindicarão o trono. O placar atualiza em tempo real na blockchain.'}
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
+      </section>
 
       {/* ── MINHAS COMPRAS ── */}
       {isConnected && walletAddress && (
