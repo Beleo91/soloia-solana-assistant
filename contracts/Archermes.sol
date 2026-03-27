@@ -148,13 +148,17 @@ contract Archermes {
         string calldata _category,
         uint256 _stock
     ) external notPaused {
-        require(_stock > 0, "Stock must be at least 1");
+        require(_stock > 0,  "Stock must be at least 1");
+        require(_price > 0,  "Price must be greater than zero");
+        require(bytes(_itemName).length > 0, "Item name required");
         Store storage s = stores[msg.sender];
-        require(bytes(s.storeName).length > 0, "No store registered");
-        require(s.expiresAt >= block.timestamp, "Store subscription expired");
+        // Subscription / registration checks — disabled for v3 open testing
+        // require(bytes(s.storeName).length > 0, "No store registered");
+        // require(s.expiresAt >= block.timestamp, "Store subscription expired");
 
         if (msg.sender != owner && s.tier == 0) {
-            require(s.productCount < FREE_TIER_LIMIT, "Free tier limit: max 10 products");
+            // Free-tier cap disabled during open testing
+            // require(s.productCount < FREE_TIER_LIMIT, "Free tier limit: max 10 products");
         }
 
         totalItems++;

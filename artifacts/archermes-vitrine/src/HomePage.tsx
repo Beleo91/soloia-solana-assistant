@@ -837,6 +837,16 @@ export default function HomePage() {
       // ABI: listItem(name: string, price: uint256, category: string, stock: uint256)
       const precoWei = parseUnits(precoStr, 18);
       const estoque = BigInt(Math.max(1, formEstoque));
+      // ── Debug payload ──────────────────────────────────────────────────────
+      console.log('[ARCHERMES] listItem payload:', {
+        nomeItem,
+        precoStr,
+        precoWei: precoWei.toString(),
+        categoria: form.categoria,
+        estoque: estoque.toString(),
+        contract: CONTRACT_ADDRESS,
+        caller: await signer.getAddress(),
+      });
       const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
       await tx.wait();
       // Persist hosted image URLs for this new listing.
