@@ -420,7 +420,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
       const c2 = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
-      const taxa = loja!.tier === 1 ? await c2.proStoreFee() : await c2.basicStoreFee();
+      const taxa = loja!.tier >= 1 ? await c2.proStoreFee() : await c2.basicStoreFee();
       const tx = await contrato.renewStore({ value: taxa });
       await tx.wait();
       setCarregando(true);
@@ -636,12 +636,12 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                           textShadow: `0 0 12px ${neonAtual.shadow}` }}>
                         {loja!.storeName}
                       </h2>
-                      {loja!.tier === 1 && (
+                      {loja!.tier >= 1 && (
                         <span className="text-[10px] font-bold tracking-widest bg-yellow-500/10
                           border border-yellow-400/40 text-yellow-300 px-2 py-0.5 rounded-full"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}>⚡ VIP PRO</span>
                       )}
-                      {loja!.tier === 0 && (
+                      {loja!.tier < 1 && (
                         <span className="text-[10px] font-bold tracking-widest bg-cyan-500/10
                           border border-cyan-400/30 text-cyan-400 px-2 py-0.5 rounded-full"
                           style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.basic')}</span>
@@ -690,7 +690,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                     </button>
                   )}
 
-                  {loja!.tier === 0 && upgradeEstado !== 'sucesso' && (
+                  {loja!.tier < 1 && upgradeEstado !== 'sucesso' && (
                     <button onClick={handleUpgradePro}
                       disabled={upgradeEstado === 'processando'}
                       className="btn-neon btn-neon-filled-gold btn-neon-full btn-neon-lg"
@@ -728,8 +728,8 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   </h3>
                   {loja && (
                     <p className="text-[10px] mt-0.5"
-                      style={{ color: loja.tier === 0 && Number(loja.productCount) >= 8 ? '#f87171' : 'rgba(255,255,255,0.25)' }}>
-                      {Number(loja.productCount)} {loja.tier === 0 ? t('dash.productLimit') : t('dash.productLimitPro')}
+                      style={{ color: loja.tier < 1 && Number(loja.productCount) >= 8 ? '#f87171' : 'rgba(255,255,255,0.25)' }}>
+                      {Number(loja.productCount)} {loja.tier < 1 ? t('dash.productLimit') : t('dash.productLimitPro')}
                     </p>
                   )}
                 </div>

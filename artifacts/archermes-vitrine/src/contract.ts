@@ -12,12 +12,13 @@ export const CONTRACT_ABI = [
   { inputs: [], name: 'upgradeToPro', outputs: [], stateMutability: 'payable', type: 'function' },
 
   // ── Listing ───────────────────────────────────────────────────────────────
+  // NOTE: v2 deployed contract uses 3-param listItem (no stock).
+  // Update to 4-param version after v3 deploy.
   {
     inputs: [
       { internalType: 'string',  name: '_itemName', type: 'string' },
       { internalType: 'uint256', name: '_price',    type: 'uint256' },
       { internalType: 'string',  name: '_category', type: 'string' },
-      { internalType: 'uint256', name: '_stock',    type: 'uint256' },
     ],
     name: 'listItem', outputs: [], stateMutability: 'nonpayable', type: 'function',
   },
@@ -67,7 +68,8 @@ export const CONTRACT_ABI = [
       { internalType: 'bool',            name: 'isDelivered', type: 'bool' },
       { internalType: 'bool',            name: 'isRefunded',  type: 'bool' },
       { internalType: 'bool',            name: 'isActive',    type: 'bool' },
-      { internalType: 'uint256',         name: 'stock',       type: 'uint256' },
+      // NOTE: stock field added in v3. Absent in v2 — will read as 0n (default).
+      // Re-enable after v3 deploy: { internalType: 'uint256', name: 'stock', type: 'uint256' },
     ],
     stateMutability: 'view', type: 'function',
   },

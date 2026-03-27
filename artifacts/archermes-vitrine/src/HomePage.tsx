@@ -834,20 +834,19 @@ export default function HomePage() {
       if (!provider) { setEstado('sem-carteira'); return; }
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      // ABI: listItem(name: string, price: uint256, category: string, stock: uint256)
+      // ABI v2: listItem(name: string, price: uint256, category: string)  — 3 params
+      // TODO after v3 deploy: add stock as 4th param
       const precoWei = parseUnits(precoStr, 18);
-      const estoque = BigInt(Math.max(1, formEstoque));
       // ── Debug payload ──────────────────────────────────────────────────────
-      console.log('[ARCHERMES] listItem payload:', {
+      console.log('[ARCHERMES] listItem payload (v2 — 3 params):', {
         nomeItem,
         precoStr,
         precoWei: precoWei.toString(),
         categoria: form.categoria,
-        estoque: estoque.toString(),
         contract: CONTRACT_ADDRESS,
         caller: await signer.getAddress(),
       });
-      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
+      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria);
       await tx.wait();
       // Persist hosted image URLs for this new listing.
       // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded
