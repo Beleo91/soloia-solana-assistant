@@ -6,6 +6,10 @@ import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import { saveStoreToRegistry, addBoostedProduct, getItemImages, getNeonShadow } from './registry';
 import { uploadImage } from './imageUploader';
+import { transferERC20, STABLECOIN_ADDRESSES, toTokenAmount } from './stablecoins';
+
+const TREASURY_WALLET = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
+const BOOST_PRICE_USDC = '5';
 
 interface StoreInfo {
   storeName: string;
@@ -90,7 +94,9 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const [boostProd, setBoostProd] = useState<MeuProduto | null>(null);
-  const [boostEstado, setBoostEstado] = useState<'idle' | 'processando' | 'sucesso'>('idle');
+  const [boostEstado, setBoostEstado] = useState<'idle' | 'processando' | 'sucesso' | 'erro'>('idle');
+  const [boostTxHash, setBoostTxHash] = useState('');
+  const [boostErro, setBoostErro] = useState('');
 
   const enderecoUsuario = walletAddress ?? '';
 
@@ -299,23 +305,43 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   }
 
   async function handleBoost(prod: MeuProduto) {
+    if (!isConnected) { void connect(); return; }
     setBoostEstado('processando');
-    await new Promise((r) => setTimeout(r, 2000));
-    const image = prod.imageUrl ?? 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=260&fit=crop';
-    addBoostedProduct({
-      id: prod.id,
-      itemName: prod.itemName,
-      priceEth: prod.priceEth,
-      category: prod.category,
-      currency: 'ETH',
-      image,
-      destaque: prod.id % 2 === 0 ? 'ouro' : 'roxo',
-      storeAddress: enderecoUsuario,
-      storeName: loja?.storeName ?? '',
-      boostedAt: Date.now(),
-    });
-    setMeusProdutos((prev) => prev.map((p) => p.id === prod.id ? { ...p, isBoosted: true } : p));
-    setBoostEstado('sucesso');
+    setBoostTxHash('');
+    setBoostErro('');
+    try {
+      await switchToArc();
+      const provider = getProvider();
+      if (!provider) throw new Error('No provider');
+      const signer = await provider.getSigner();
+
+      const usdcAddress = STABLECOIN_ADDRESSES['USDC'];
+      const boostAmount = toTokenAmount(BOOST_PRICE_USDC, 'USDC');
+      const tx = await transferERC20(signer, usdcAddress, TREASURY_WALLET, boostAmount);
+      await tx.wait();
+
+      setBoostTxHash(tx.hash);
+
+      const image = prod.imageUrl ?? 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=260&fit=crop';
+      addBoostedProduct({
+        id: prod.id,
+        itemName: prod.itemName,
+        priceEth: prod.priceEth,
+        category: prod.category,
+        currency: 'USDC',
+        image,
+        destaque: prod.id % 2 === 0 ? 'ouro' : 'roxo',
+        storeAddress: enderecoUsuario,
+        storeName: loja?.storeName ?? '',
+        boostedAt: Date.now(),
+      });
+      setMeusProdutos((prev) => prev.map((p) => p.id === prod.id ? { ...p, isBoosted: true } : p));
+      setBoostEstado('sucesso');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBoostErro(msg.length > 120 ? msg.slice(0, 120) + '…' : msg);
+      setBoostEstado('erro');
+    }
   }
 
   async function handleSetRastreio(id: number, code: string) {
@@ -710,7 +736,7 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                         </span>
                       ) : (
                         <button
-                          onClick={() => { setBoostProd(prod); setBoostEstado('idle'); }}
+                          onClick={() => { setBoostProd(prod); setBoostEstado('idle'); setBoostTxHash(''); setBoostErro(''); }}
                           className="btn-neon btn-neon-sm"
                           style={{ borderColor: '#fbbf24', color: '#fbbf24', background: 'rgba(251,191,36,0.08)', boxShadow: '0 0 10px rgba(251,191,36,0.2)' }}>
                           {t('dash.boost')}
@@ -1047,12 +1073,44 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
                   style={{ fontFamily: "'Orbitron', sans-serif" }}>
                   {t('boost.success')}
                 </p>
+                {boostTxHash && (
+                  <a
+                    href={`https://explorer.testnet.arc.network/tx/${boostTxHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-mono text-cyan-400 hover:text-cyan-300 underline underline-offset-2 break-all text-center"
+                  >
+                    TX: {boostTxHash.slice(0, 12)}…{boostTxHash.slice(-8)}
+                  </a>
+                )}
                 <button
                   onClick={() => setBoostProd(null)}
                   className="mt-1 px-6 py-2 rounded-lg text-xs font-bold tracking-widest uppercase text-black"
                   style={{ background: '#fbbf24', fontFamily: "'Orbitron', sans-serif" }}>
                   ✓ OK
                 </button>
+              </div>
+            )}
+
+            {boostEstado === 'erro' && (
+              <div className="flex flex-col items-center gap-3 py-2">
+                <span style={{ fontSize: '1.75rem' }}>⚠️</span>
+                <p className="text-red-400 text-[11px] text-center font-mono leading-snug">
+                  {boostErro || 'Transaction failed'}
+                </p>
+                <div className="flex gap-2 mt-1">
+                  <button
+                    onClick={() => setBoostEstado('idle')}
+                    className="px-5 py-2 rounded-lg text-xs font-bold tracking-widest uppercase"
+                    style={{ background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', fontFamily: "'Orbitron', sans-serif" }}>
+                    {t('boost.cancel')} / Retry
+                  </button>
+                  <button
+                    onClick={() => setBoostProd(null)}
+                    className="px-4 py-2 rounded-lg text-xs tracking-widest uppercase text-white/40 hover:text-white/60 transition-colors border border-white/10">
+                    {t('boost.cancel')}
+                  </button>
+                </div>
               </div>
             )}
           </div>
