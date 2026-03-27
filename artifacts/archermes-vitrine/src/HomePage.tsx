@@ -980,7 +980,7 @@ export default function HomePage() {
             {isConnected && <button onClick={disconnect} className="btn-sair">Sair</button>}
           </div>
         </header>
-        {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => { setPagina('home'); carregarDadosLocais(); }} />}
+        {pagina === 'minha-loja' && <StoreDashboard onVoltar={() => { setPagina('home'); carregarDadosLocais(); }} onAnunciar={() => { setPagina('home'); setTimeout(abrirModal, 80); }} />}
         {pagina === 'afiliado' && <AffiliateDashboard onVoltar={() => setPagina('home')} />}
       </div>
     );
@@ -1064,7 +1064,6 @@ export default function HomePage() {
               {t('nav.affiliate')}
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStoreIcon')}</button>
-            <button onClick={abrirModal} className="btn-anunciar">{t('nav.list')}</button>
             <button onClick={disconnect} className="btn-sair">{t('nav.disconnect')}</button>
           </div>
         )}

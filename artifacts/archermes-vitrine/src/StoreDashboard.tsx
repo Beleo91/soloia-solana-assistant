@@ -63,7 +63,7 @@ const PRESET_AVATARS = [
 
 type DashEstado = 'idle' | 'criando' | 'sucesso' | 'erro';
 
-export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
+export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () => void; onAnunciar?: () => void }) {
   const { isConnected, connect, address: walletAddress, switchToArc, getProvider } = useWallet();
   const { t, lang } = useLang();
 
@@ -670,6 +670,26 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
 
                 {/* Ações */}
                 <div className="flex flex-col gap-3">
+                  {/* Botão principal: Anunciar Produto */}
+                  {onAnunciar && (
+                    <button onClick={onAnunciar}
+                      className="btn-neon btn-neon-full btn-neon-lg"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,229,255,0.05))',
+                        border: '1.5px solid rgba(0,229,255,0.5)',
+                        color: '#00e5ff',
+                        fontFamily: "'Orbitron', sans-serif",
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        boxShadow: '0 0 18px rgba(0,229,255,0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                      }}>
+                      <span style={{ fontSize: '1rem' }}>⚡</span>
+                      {lang === 'en' ? '+ List Product' : '+ Anunciar Produto'}
+                    </button>
+                  )}
+
                   {loja!.tier === 0 && upgradeEstado !== 'sucesso' && (
                     <button onClick={handleUpgradePro}
                       disabled={upgradeEstado === 'processando'}
