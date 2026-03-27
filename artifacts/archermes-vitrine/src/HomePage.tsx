@@ -475,6 +475,12 @@ export default function HomePage() {
   // Escrow / Compra Segura
   const [escrowAtivo, setEscrowAtivo] = useState(true);
 
+  // ── LEADERBOARD ──
+  type LeaderboardSeller = { address: string; storeName: string; avatarUrl?: string; salesCount: number };
+  type LeaderboardBuyer  = { address: string; buyCount: number };
+  const [leaderboardSellers, setLeaderboardSellers] = useState<LeaderboardSeller[]>([]);
+  const [leaderboardBuyers,  setLeaderboardBuyers]  = useState<LeaderboardBuyer[]>([]);
+
   // Minhas Compras (histórico do comprador)
   const [showMinhasCompras, setShowMinhasCompras] = useState(false);
   const [minhasCompras, setMinhasCompras] = useState<ItemComprado[]>([]);
@@ -628,6 +634,58 @@ export default function HomePage() {
       }
     }, 800);
   });
+
+  // ── LEADERBOARD: carrega eventos ItemBought + ItemListed para calcular top vendedores e compradores ──
+  useEffect(() => {
+    async function carregarLeaderboard() {
+      try {
+        const rpcProvider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpcProvider);
+
+        const [eventsListed, eventsBought] = await Promise.all([
+          contrato.queryFilter(contrato.filters.ItemListed()) as Promise<import('ethers').EventLog[]>,
+          contrato.queryFilter(contrato.filters.ItemBought()) as Promise<import('ethers').EventLog[]>,
+        ]);
+
+        const sellerMap = new Map<bigint, string>();
+        for (const ev of eventsListed) {
+          const id: bigint = ev.args[0];
+          const seller: string = ev.args[3];
+          sellerMap.set(id, seller.toLowerCase());
+        }
+
+        const buyerCount  = new Map<string, number>();
+        const sellerCount = new Map<string, number>();
+        for (const ev of eventsBought) {
+          const id: bigint = ev.args[0];
+          const buyer: string = ev.args[1].toLowerCase();
+          buyerCount.set(buyer, (buyerCount.get(buyer) ?? 0) + 1);
+          const seller = sellerMap.get(id);
+          if (seller) sellerCount.set(seller, (sellerCount.get(seller) ?? 0) + 1);
+        }
+
+        const topBuyers: LeaderboardBuyer[] = Array.from(buyerCount.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([address, buyCount]) => ({ address, buyCount }));
+
+        const registry = getStoreRegistry();
+        const topSellers: LeaderboardSeller[] = Array.from(sellerCount.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([address, salesCount]) => {
+            const store = registry.find((s) => s.address.toLowerCase() === address);
+            return { address, storeName: store?.storeName ?? abreviarEndereco(address), avatarUrl: store?.avatarUrl, salesCount };
+          });
+
+        setLeaderboardSellers(topSellers);
+        setLeaderboardBuyers(topBuyers);
+      } catch {
+        // silently fail — leaderboard is non-critical
+      }
+    }
+    void carregarLeaderboard();
+  }, []);
 
   // ── MINHAS COMPRAS ──
   const carregarMinhasCompras = useCallback(async () => {
@@ -855,14 +913,6 @@ export default function HomePage() {
           <div className="modal-overlay" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>
             <div className="modal-compra-box" onClick={(e) => e.stopPropagation()}>
               <button className="modal-fechar" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>✕</button>
-              {buyEstado === 'confirmando' && (
-                <div className="modal-sucesso">
-                  <div className="sucesso-icone" style={{ color: '#00e5ff' }}>⏳</div>
-                  <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.9rem', letterSpacing: '0.1em' }}>
-                    {lang === 'en' ? 'Confirm in your wallet...' : 'Confirme na sua carteira...'}
-                  </h2>
-                </div>
-              )}
               {buyEstado === 'sucesso' && (
                 <div className="modal-sucesso">
                   <div className="sucesso-icone">✓</div>
@@ -883,7 +933,7 @@ export default function HomePage() {
                   </button>
                 </div>
               )}
-              {buyEstado === 'idle' && itemParaComprar && (
+              {(buyEstado === 'idle' || buyEstado === 'confirmando') && itemParaComprar && (
                 <div style={{ padding: '0.5rem' }}>
                   <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.08em', marginBottom: '1rem', color: '#00e5ff' }}>
                     {lang === 'en' ? 'Confirm Purchase' : 'Confirmar Compra'}
@@ -895,8 +945,17 @@ export default function HomePage() {
                       {parseFloat(itemParaComprar.priceEth).toFixed(4)} ETH
                     </span>
                   </div>
-                  <button className="btn-neon btn-neon-full btn-neon-cyan" onClick={() => void confirmarCompra()}>
-                    {t('vitrine.buyNow')}
+                  <button
+                    className="btn-neon btn-neon-full btn-neon-cyan"
+                    disabled={buyEstado === 'confirmando'}
+                    onClick={buyEstado === 'idle' ? () => void confirmarCompra() : undefined}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    {buyEstado === 'confirmando' ? (
+                      <>
+                        <span className="btn-spinner" />
+                        {lang === 'en' ? 'Confirm in wallet…' : 'Confirme na carteira…'}
+                      </>
+                    ) : t('vitrine.buyNow')}
                   </button>
                 </div>
               )}
@@ -1226,6 +1285,107 @@ export default function HomePage() {
         </div>
         <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </section>
+
+      {/* ── 🏆 TOP ARCHITECTS LEADERBOARD ── */}
+      {(leaderboardSellers.length > 0 || leaderboardBuyers.length > 0) && (
+        <section className="vitrine-container leaderboard-section">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-5">
+            <span style={{ fontSize: '1.3rem', filter: 'drop-shadow(0 0 10px rgba(251,191,36,0.7))' }}>🏆</span>
+            <div>
+              <h2 className="text-xl font-black tracking-widest uppercase"
+                style={{ fontFamily: "'Orbitron', sans-serif",
+                  background: 'linear-gradient(90deg,#fbbf24,#00e5ff)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {lang === 'en' ? 'Top Architects of the Week' : 'Top Architects da Semana'}
+              </h2>
+              <p className="text-white/25 text-xs tracking-wide mt-0.5">
+                {lang === 'en' ? 'Ranked by on-chain activity' : 'Ranqueado por atividade on-chain'}
+              </p>
+            </div>
+          </div>
+
+          <div className="leaderboard-panel">
+            <div className="leaderboard-grid">
+              {/* ── Top Vendedores ── */}
+              {leaderboardSellers.length > 0 && (
+                <div>
+                  <p className="leaderboard-col-title" style={{ color: '#fbbf24' }}>
+                    {lang === 'en' ? '🏪 Top Stores' : '🏪 Top Lojas'}
+                  </p>
+                  {leaderboardSellers.map((seller, i) => (
+                    <div key={seller.address} className={`leaderboard-row leaderboard-row-${i + 1}`}>
+                      <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>
+                        {i === 0 ? '👑' : i === 1 ? '🥈' : '🥉'}
+                      </span>
+                      <div className="leaderboard-avatar">
+                        {seller.avatarUrl ? (
+                          <img src={seller.avatarUrl} alt={seller.storeName} />
+                        ) : (
+                          <span style={{ fontSize: '1rem' }}>⬡</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <span className="font-bold text-white text-xs truncate leading-tight"
+                          style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.65rem', letterSpacing: '0.05em',
+                            ...(i === 0 ? { color: '#fbbf24', textShadow: '0 0 8px rgba(251,191,36,0.4)' } :
+                               i === 1 ? { color: '#c8d4e8' } : { color: '#cd7f32' }) }}>
+                          {seller.storeName}
+                        </span>
+                        <span className="text-white/30 text-[10px] font-mono truncate">
+                          {abreviarEndereco(seller.address)}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black flex-shrink-0 tabular-nums"
+                        style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.65rem',
+                          ...(i === 0 ? { color: '#fbbf24' } : i === 1 ? { color: '#c8d4e8' } : { color: '#cd7f32' }) }}>
+                        {seller.salesCount} {lang === 'en' ? 'sales' : 'vendas'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Top Compradores ── */}
+              {leaderboardBuyers.length > 0 && (
+                <div>
+                  <p className="leaderboard-col-title" style={{ color: '#00e5ff' }}>
+                    {lang === 'en' ? '💎 Top Buyers' : '💎 Top Compradores'}
+                  </p>
+                  {leaderboardBuyers.map((buyer, i) => (
+                    <div key={buyer.address} className={`leaderboard-row leaderboard-row-${i + 1}`}>
+                      <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>
+                        {i === 0 ? '👑' : i === 1 ? '🥈' : '🥉'}
+                      </span>
+                      <div className="leaderboard-avatar"
+                        style={{ background: 'rgba(0,229,255,0.08)', borderColor: 'rgba(0,229,255,0.2)' }}>
+                        <span style={{ fontSize: '0.9rem' }}>🧑‍💻</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                        <span className="font-bold text-white text-xs truncate leading-tight"
+                          style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.65rem', letterSpacing: '0.05em',
+                            ...(i === 0 ? { color: '#fbbf24', textShadow: '0 0 8px rgba(251,191,36,0.4)' } :
+                               i === 1 ? { color: '#c8d4e8' } : { color: '#cd7f32' }) }}>
+                          {abreviarEndereco(buyer.address)}
+                        </span>
+                        <span className="text-white/20 text-[9px]">
+                          {lang === 'en' ? 'Verified buyer' : 'Comprador verificado'}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black flex-shrink-0 tabular-nums"
+                        style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.65rem',
+                          ...(i === 0 ? { color: '#fbbf24' } : i === 1 ? { color: '#c8d4e8' } : { color: '#cd7f32' }) }}>
+                        {buyer.buyCount} {lang === 'en' ? 'buys' : 'compras'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
+        </section>
+      )}
 
       {/* ── MINHAS COMPRAS ── */}
       {isConnected && walletAddress && (
@@ -1760,7 +1920,7 @@ export default function HomePage() {
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <button className="modal-fechar" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>✕</button>
 
-            {buyEstado === 'idle' && (
+            {(buyEstado === 'idle' || buyEstado === 'confirmando') && (
               <>
                 <div className="modal-topo">
                   <span className="modal-icone">⚡</span>
@@ -1859,26 +2019,22 @@ export default function HomePage() {
                     );
                   })()}
 
-                  <button onClick={confirmarCompra} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
-                    {t('modal.buy.confirm')}
+                  <button
+                    onClick={buyEstado === 'idle' ? confirmarCompra : undefined}
+                    className="btn-publicar"
+                    disabled={buyEstado === 'confirmando'}
+                    style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    {buyEstado === 'confirmando' ? (
+                      <>
+                        <span className="btn-spinner" />
+                        {(itemParaComprar?.currency === 'USDC' || itemParaComprar?.currency === 'EURC')
+                          ? (lang === 'en' ? 'Confirm 2 txs in wallet…' : 'Confirme 2 txs na carteira…')
+                          : (lang === 'en' ? 'Confirm in wallet…' : 'Confirme na carteira…')}
+                      </>
+                    ) : t('modal.buy.confirm')}
                   </button>
                 </div>
               </>
-            )}
-
-            {buyEstado === 'confirmando' && (
-              <div className="modal-sucesso">
-                <div className="sucesso-icone spinner">⟳</div>
-                <h2>{t('modal.buy.processing')}</h2>
-                {(itemParaComprar?.currency === 'USDC' || itemParaComprar?.currency === 'EURC') ? (
-                  <p>{lang === 'en'
-                    ? <>Confirm the <strong>2 transactions</strong> in your wallet: <em>Approve</em> then the transfer.</>
-                    : <>Confirme as <strong>2 transações</strong> na sua carteira: <em>Approve</em> e depois a transferência.</>}
-                  </p>
-                ) : (
-                  <p>{t('modal.buy.confirmingDesc')}</p>
-                )}
-              </div>
             )}
 
             {buyEstado === 'sucesso' && (

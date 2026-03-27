@@ -118,6 +118,12 @@ Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript 
 - Lojas Parceiras: horizontal-scroll carousel, banner + overlapping round logo + 2×2 mini product grid
 - Produtos Impulsionados: 4 premium cards with gold/purple neon borders, glow-pulse animation
 - StoreDashboard visual panel: preset banner gallery (4), preset avatar gallery (4), file upload dropzones with drag-and-drop, neon color picker
+- Ghost products bug fix: `cancelItem` called on-chain before local cleanup; BroadcastChannel sync via `product:cancelled`
+- Stock system v3: `uint256 stock` in Item struct; `listItem` requires `_stock >= 1`; `buyItem` decrements stock; frontend shows ⛔ ESGOTADO badge
+- ImgBB pipeline: API server `/api/images/upload` proxies to ImgBB; permanent `https://i.ibb.co/...` URLs stored
+- Glassmorphism UI: modal-box + modal-compra-box use `backdrop-filter: blur(24px)` glass effect; product card hover glow (cyan)
+- Buy button micro-interaction: inline `.btn-spinner` CSS spinner inside the button when `buyEstado === 'confirmando'`; no blocking full-screen overlay
+- Top Architects Leaderboard: queries `ItemBought` + `ItemListed` events on-chain; shows top 3 sellers (by salesCount) + top 3 buyers (by buyCount) with 👑🥈🥉 ranking
 
 **Image Hosting**:
 - `src/imageUploader.ts` — abstraction layer for image uploads

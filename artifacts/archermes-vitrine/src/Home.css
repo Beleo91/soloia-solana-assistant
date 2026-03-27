@@ -229,13 +229,19 @@ body::after {
 }
 .modal-box {
   position: relative;
-  background: linear-gradient(145deg, #0c1022, #101828);
-  border: 1px solid rgba(0, 229, 255, 0.25);
+  background: rgba(8, 12, 30, 0.90);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 229, 255, 0.18);
   border-radius: 1.25rem;
   padding: 2.25rem 2rem 2rem;
   width: 100%;
   max-width: 460px;
-  box-shadow: 0 0 60px rgba(0, 229, 255, 0.08), 0 24px 48px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(0,229,255,0.05),
+    0 0 80px rgba(0, 229, 255, 0.06),
+    0 24px 48px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255,255,255,0.04);
   animation: modalEntrar 0.22s ease;
 }
 @keyframes modalEntrar {
@@ -385,10 +391,16 @@ body::after {
   text-shadow: 0 0 12px rgba(192,132,252,0.5);
 }
 
-/* ─── CARD TILT TRANSITION ─── */
+/* ─── CARD TILT TRANSITION + HOVER GLOW ─── */
 .card-produto {
-  transition: box-shadow 0.15s;
+  transition: box-shadow 0.25s, transform 0.15s;
   will-change: transform;
+}
+.card-produto:hover {
+  box-shadow:
+    0 8px 32px rgba(0, 229, 255, 0.10),
+    0 0 0 1px rgba(0, 229, 255, 0.14),
+    0 0 24px rgba(0, 229, 255, 0.06);
 }
 
 /* ─── SCROLLBAR HIDDEN ─── */
@@ -973,6 +985,155 @@ body::after {
 
 .card-thumb-active-gold img {
   opacity: 1;
+}
+
+/* ─── GLASSMORPHISM BUY MODAL ─── */
+.modal-compra-box {
+  position: relative;
+  background: rgba(8, 12, 30, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(0, 229, 255, 0.16);
+  border-radius: 1.25rem;
+  padding: 2rem 1.75rem 1.75rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow:
+    0 0 0 1px rgba(0,229,255,0.06),
+    0 0 80px rgba(0, 229, 255, 0.05),
+    0 32px 64px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: modalEntrar 0.22s ease;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+/* ─── INLINE BUTTON SPINNER ─── */
+.btn-spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spinBtn 0.65s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+@keyframes spinBtn { to { transform: rotate(360deg); } }
+.btn-publicar:disabled { opacity: 0.65; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════
+   🏆 TOP ARCHITECTS — LEADERBOARD
+   ═══════════════════════════════════════════════ */
+.leaderboard-section {
+  position: relative;
+  padding: 2.5rem 0 0;
+}
+
+.leaderboard-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 1.25rem;
+  padding: 1.75rem 2rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: relative;
+  overflow: hidden;
+}
+.leaderboard-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(251,191,36,0.5), rgba(0,229,255,0.5), transparent);
+}
+
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+@media (max-width: 640px) {
+  .leaderboard-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+
+.leaderboard-col-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.85rem;
+  opacity: 0.4;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.018);
+  margin-bottom: 0.45rem;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  cursor: default;
+}
+.leaderboard-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* Gold — rank 1 */
+.leaderboard-row-1 {
+  border-color: rgba(251, 191, 36, 0.32);
+  background: rgba(251, 191, 36, 0.04);
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.07);
+}
+.leaderboard-row-1:hover {
+  border-color: rgba(251, 191, 36, 0.52);
+  background: rgba(251, 191, 36, 0.07);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.12);
+}
+
+/* Silver — rank 2 */
+.leaderboard-row-2 {
+  border-color: rgba(200, 210, 230, 0.22);
+  background: rgba(200, 210, 230, 0.025);
+}
+.leaderboard-row-2:hover {
+  border-color: rgba(200, 210, 230, 0.4);
+}
+
+/* Bronze — rank 3 */
+.leaderboard-row-3 {
+  border-color: rgba(205, 127, 50, 0.25);
+  background: rgba(205, 127, 50, 0.03);
+}
+.leaderboard-row-3:hover {
+  border-color: rgba(205, 127, 50, 0.45);
+}
+
+.leaderboard-avatar {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(0, 229, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.leaderboard-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ─── VITRINE CENTERED CONTAINER ─── */
