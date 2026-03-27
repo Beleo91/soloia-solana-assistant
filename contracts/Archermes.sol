@@ -65,7 +65,12 @@ contract Archermes {
     modifier notPaused()  { require(!paused,              "Contract paused");     _; }
 
     // ── Constructor ──────────────────────────────────────────────────────────
-    constructor() { owner = payable(msg.sender); }
+    // _admin is the permanent marketplace owner/treasury (0x434189487484F20B9Bf0e0c28C1559B0c961274B).
+    // The deployer wallet just pays gas — ownership is set to _admin from block 0.
+    constructor(address payable _admin) {
+        require(_admin != address(0), "Invalid admin address");
+        owner = _admin;
+    }
 
     // ── Admin ────────────────────────────────────────────────────────────────
     function togglePause() external onlyOwner { paused = !paused; }

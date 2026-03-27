@@ -19,9 +19,12 @@ const OUT = path.join(__dirname, 'out');
 const RPC_URL  = 'https://rpc.testnet.arc.network';
 const CHAIN_ID = 5042002;
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
+// The official marketplace admin/treasury — owner from block 0
+const ADMIN_ADDRESS = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
+
+const PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
 if (!PRIVATE_KEY) {
-  console.error('ERROR: PRIVATE_KEY env var is required.');
+  console.error('ERROR: DEPLOYER_PRIVATE_KEY env var is required.');
   process.exit(1);
 }
 
@@ -38,7 +41,10 @@ console.log(`Balance : ${ethers.formatEther(balance)} ETH`);
 const factory = new ethers.ContractFactory(abi, bytecode, wallet);
 
 console.log('Sending deploy transaction …');
-const contract = await factory.deploy();
+console.log(`  Admin (owner) will be: ${ADMIN_ADDRESS}`);
+// Pass the permanent admin address as constructor argument.
+// The deployer wallet only pays gas — it has no privileged role after deploy.
+const contract = await factory.deploy(ADMIN_ADDRESS);
 const receipt  = await contract.deploymentTransaction().wait();
 
 const info = {
