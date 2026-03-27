@@ -733,11 +733,34 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                     </p>
                   )}
                 </div>
-                <button onClick={carregarMeusProdutos}
-                  className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
-                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                  {t('vitrine.refresh')}
-                </button>
+                <div className="flex items-center gap-2">
+                  {onAnunciar && (
+                    <button onClick={onAnunciar}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        padding: '0.45rem 1rem',
+                        borderRadius: '999px',
+                        border: '1.5px solid rgba(0,229,255,0.5)',
+                        background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(0,229,255,0.04))',
+                        color: '#00e5ff',
+                        fontFamily: "'Orbitron', sans-serif",
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        cursor: 'pointer',
+                        boxShadow: '0 0 12px rgba(0,229,255,0.15)',
+                        transition: 'all 0.2s ease',
+                      }}>
+                      <span style={{ fontSize: '0.85rem' }}>⚡</span>
+                      {lang === 'en' ? '+ LIST' : '+ ANUNCIAR'}
+                    </button>
+                  )}
+                  <button onClick={carregarMeusProdutos}
+                    className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
+                    style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    {t('vitrine.refresh')}
+                  </button>
+                </div>
               </div>
 
               {carregandoProdutos && (
