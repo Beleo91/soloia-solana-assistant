@@ -11,6 +11,7 @@ import {
 } from './stablecoins';
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
+import StoreView, { type StoreItem } from './StoreView';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
 import { uploadImages } from './imageUploader';
 import './Home.css';
@@ -198,7 +199,7 @@ interface FormData {
 
 type Estado = 'idle' | 'enviando' | 'sucesso' | 'erro' | 'sem-carteira';
 type BuyEstado = 'idle' | 'confirmando' | 'sucesso' | 'erro';
-type Pagina = 'home' | 'minha-loja' | 'afiliado';
+type Pagina = 'home' | 'minha-loja' | 'afiliado' | 'loja-view';
 
 function abreviarEndereco(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -245,6 +246,13 @@ export default function HomePage() {
   const { t, lang, toggleLang } = useLang();
 
   const [pagina, setPagina] = useState<Pagina>('home');
+  const [lojaAtiva, setLojaAtiva] = useState<string>('');
+
+  function verLoja(address: string) {
+    setLojaAtiva(address);
+    setPagina('loja-view');
+  }
+
   const [modalAberto, setModalAberto] = useState(false);
   const [estado, setEstado] = useState<Estado>('idle');
 
@@ -616,6 +624,77 @@ export default function HomePage() {
     ? vitrine : vitrine.filter((i) => i.category === filtroCategoria);
 
   // ── PÁGINA SECUNDÁRIA ──
+  if (pagina === 'loja-view') {
+    return (
+      <>
+        <StoreView
+          storeAddress={lojaAtiva}
+          storeInfo={lojasReais.find((s) => s.address.toLowerCase() === lojaAtiva.toLowerCase())}
+          allItems={vitrine as StoreItem[]}
+          sellersPro={sellersPro}
+          isConnected={isConnected}
+          onVoltar={() => setPagina('home')}
+          onAbrirCompra={(item) => abrirCompra(item as ItemBlockchain)}
+          t={t}
+          lang={lang}
+        />
+        {/* Buy modal available from StoreView too */}
+        {itemParaComprar && (
+          <div className="modal-overlay" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>
+            <div className="modal-compra-box" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-fechar" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>✕</button>
+              {buyEstado === 'confirmando' && (
+                <div className="modal-sucesso">
+                  <div className="sucesso-icone" style={{ color: '#00e5ff' }}>⏳</div>
+                  <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.9rem', letterSpacing: '0.1em' }}>
+                    {lang === 'en' ? 'Confirm in your wallet...' : 'Confirme na sua carteira...'}
+                  </h2>
+                </div>
+              )}
+              {buyEstado === 'sucesso' && (
+                <div className="modal-sucesso">
+                  <div className="sucesso-icone">✓</div>
+                  <h2>{lang === 'en' ? 'Purchase confirmed!' : 'Compra confirmada!'}</h2>
+                  {buyTx && <p className="text-white/40 text-xs font-mono break-all mt-2">Tx: {buyTx}</p>}
+                  <button className="btn-publicar mt-4" onClick={() => { setItemParaComprar(null); setBuyEstado('idle'); }}>
+                    {lang === 'en' ? 'Close' : 'Fechar'}
+                  </button>
+                </div>
+              )}
+              {buyEstado === 'erro' && (
+                <div className="modal-sucesso">
+                  <div className="sucesso-icone" style={{ color: '#f87171' }}>✕</div>
+                  <h2>{lang === 'en' ? 'Purchase error' : 'Erro na compra'}</h2>
+                  {buyErro && <p className="text-white/40 text-xs mt-2">{buyErro}</p>}
+                  <button className="btn-publicar mt-4" onClick={() => setBuyEstado('idle')}>
+                    {lang === 'en' ? 'Try again' : 'Tentar novamente'}
+                  </button>
+                </div>
+              )}
+              {buyEstado === 'idle' && itemParaComprar && (
+                <div style={{ padding: '0.5rem' }}>
+                  <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.08em', marginBottom: '1rem', color: '#00e5ff' }}>
+                    {lang === 'en' ? 'Confirm Purchase' : 'Confirmar Compra'}
+                  </h2>
+                  <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{itemParaComprar.itemName}</p>
+                  <p className="text-white/30 text-xs font-mono">{t('vitrine.seller')} {abreviarEndereco(itemParaComprar.seller)}</p>
+                  <div style={{ margin: '1.25rem 0', padding: '0.75rem', background: 'rgba(0,229,255,0.06)', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)' }}>
+                    <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '1.2rem', fontWeight: 900, color: '#00e5ff' }}>
+                      {parseFloat(itemParaComprar.priceEth).toFixed(4)} ETH
+                    </span>
+                  </div>
+                  <button className="btn-neon btn-neon-full btn-neon-cyan" onClick={() => void confirmarCompra()}>
+                    {t('vitrine.buyNow')}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
   if (pagina !== 'home') {
     return (
       <div className="container-principal">
@@ -796,14 +875,20 @@ export default function HomePage() {
               .map((p) => p.image),
           })) : MOCK_LOJAS_PARCEIRAS).map((loja) => (
             <div key={loja.id} className="parceira-card"
-              style={{ borderColor: loja.cor + '30' }}
+              role="button"
+              tabIndex={0}
+              style={{ borderColor: loja.cor + '30', cursor: 'pointer' }}
+              onClick={() => verLoja(loja.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') verLoja(loja.id); }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 28px ${loja.corSombra}`;
                 (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '66';
+                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLDivElement).style.boxShadow = '';
                 (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '30';
+                (e.currentTarget as HTMLDivElement).style.transform = '';
               }}>
 
               {/* Banner */}
@@ -1076,9 +1161,25 @@ export default function HomePage() {
                         textShadow: isPro ? '0 0 10px rgba(251,191,36,0.3)' : 'none' }}>
                       {item.itemName}
                     </h3>
-                    <p className="text-white/30 text-[11px] tracking-wide font-mono">
-                      {abreviarEndereco(item.seller)}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-white/30 text-[11px] tracking-wide font-mono">
+                        {abreviarEndereco(item.seller)}
+                      </p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); verLoja(item.seller); }}
+                        style={{
+                          fontSize: '0.58rem', fontFamily: "'Orbitron', sans-serif",
+                          letterSpacing: '0.08em', color: isPro ? '#fbbf24' : '#00e5ff',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          padding: '0', opacity: 0.7, whiteSpace: 'nowrap',
+                          transition: 'opacity 0.15s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
+                        onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.7'}
+                      >
+                        {lang === 'en' ? 'Visit Store →' : 'Ver Loja →'}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-end justify-between">
                     <div>
