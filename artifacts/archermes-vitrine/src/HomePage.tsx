@@ -39,9 +39,11 @@ const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa'
 function extractContractError(err: unknown): string {
   if (!err) return 'Unknown error';
   const e = err as Record<string, unknown>;
-  // 1. ethers v6 shortcircuit: `reason` field contains the decoded revert string
+  // 1. ethers v6: `reason` field contains the decoded revert string
   if (typeof e.reason === 'string' && e.reason.length > 0) return e.reason;
-  // 2. MetaMask wraps the original RPC error inside `info.error`
+  // 2. viem shortMessage (clean one-liner)
+  if (typeof e.shortMessage === 'string' && e.shortMessage.length > 0) return e.shortMessage;
+  // 3. MetaMask / Rabby wraps the original RPC error inside `info.error`
   try {
     const info = e.info as Record<string, unknown> | undefined;
     if (info) {
@@ -50,17 +52,27 @@ function extractContractError(err: unknown): string {
       if (typeof info.message === 'string') return info.message;
     }
   } catch { /* ignore */ }
-  // 3. `data.message` sometimes carries the revert reason
+  // 4. `data.message` sometimes carries the revert reason
   try {
     const data = e.data as Record<string, unknown> | undefined;
     if (data && typeof data.message === 'string') return data.message;
   } catch { /* ignore */ }
-  // 4. Standard JS Error
+  // 5. Standard JS Error — extract meaningful part
   if (err instanceof Error) {
     const m = err.message;
-    // Trim ethers boilerplate prefix if present
+    // ethers boilerplate: reason="..."
     const rMatch = m.match(/reason="([^"]+)"/);
     if (rMatch) return rMatch[1];
+    // viem pattern: "Details: <msg>  Version: ..."
+    const detailsMatch = m.match(/Details:\s*(.+?)(?:\s+Version:|$)/s);
+    if (detailsMatch) {
+      const detail = detailsMatch[1].trim();
+      if (detail.toLowerCase().includes('execution reverted'))
+        return 'Transação revertida pelo contrato. Verifique se sua loja está ativa e os dados estão corretos.';
+      return detail.length > 200 ? detail.slice(0, 200) + '…' : detail;
+    }
+    if (m.toLowerCase().includes('execution reverted'))
+      return 'Transação revertida pelo contrato. Verifique se sua loja está ativa e os dados estão corretos.';
     return m.length > 200 ? m.slice(0, 200) + '…' : m;
   }
   return String(err).slice(0, 200);
@@ -777,6 +789,26 @@ export default function HomePage() {
   async function handlePublicar(e: React.FormEvent) {
     e.preventDefault();
     setEstado('enviando'); setErroMsg('');
+
+    // ── Sanitização e validação de inputs ──────────────────────────────────
+    const nomeItem = form.nomeItem.trim();
+    // Normaliza separador decimal: vírgula → ponto
+    const precoStr = form.preco.replace(',', '.').replace(/\s/g, '');
+    const precoNum = parseFloat(precoStr);
+
+    if (!nomeItem) {
+      setErroMsg('Nome do item é obrigatório.');
+      setEstado('erro'); return;
+    }
+    if (isNaN(precoNum) || precoNum <= 0) {
+      setErroMsg('Preço inválido. Use um número maior que zero (ex: 0.05).');
+      setEstado('erro'); return;
+    }
+    if (formEstoque < 1) {
+      setErroMsg('Quantidade em estoque deve ser pelo menos 1.');
+      setEstado('erro'); return;
+    }
+
     // Verificar limite do plano grátis (10 produtos)
     const minhaLojaReg = lojasReais.find((s) => s.address.toLowerCase() === walletAddress?.toLowerCase());
     if (minhaLojaReg && minhaLojaReg.tier === 0 && minhaLojaReg.productCount >= 10) {
@@ -791,9 +823,10 @@ export default function HomePage() {
       if (!provider) { setEstado('sem-carteira'); return; }
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const precoWei = parseUnits(form.preco, 18);
+      // ABI: listItem(name: string, price: uint256, category: string, stock: uint256)
+      const precoWei = parseUnits(precoStr, 18);
       const estoque = BigInt(Math.max(1, formEstoque));
-      const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria, estoque);
+      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
       await tx.wait();
       // Persist hosted image URLs for this new listing.
       // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded
