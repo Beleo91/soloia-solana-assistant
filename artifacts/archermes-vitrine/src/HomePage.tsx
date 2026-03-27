@@ -214,6 +214,18 @@ function lerRefDaUrl(): string {
   return ZERO_ADDRESS;
 }
 
+function lerItemDaUrl(): number | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const item = params.get('item');
+    if (item) {
+      const n = parseInt(item, 10);
+      if (!isNaN(n) && n > 0) return n;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 function handleTilt(e: React.MouseEvent<HTMLDivElement>) {
   const el = e.currentTarget;
   const rect = el.getBoundingClientRect();
@@ -339,6 +351,8 @@ export default function HomePage() {
 
   const [selectedImages, setSelectedImages] = useState<Record<number, number>>({});
   const [itemImageErrors, setItemImageErrors] = useState<Record<number, boolean>>({});
+  const [copiedAffId, setCopiedAffId] = useState<number | null>(null);
+  const itemDaUrl = lerItemDaUrl();
 
   // Upload de imagens no modal
   const [formImages, setFormImages] = useState<File[]>([]);
@@ -517,6 +531,14 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => { carregarVitrine(); }, [carregarVitrine]);
+
+  // Auto-abrir modal de compra quando URL contém ?item=ID
+  useEffect(() => {
+    if (!itemDaUrl || vitrine.length === 0) return;
+    const item = vitrine.find((i) => i.id === itemDaUrl);
+    if (item) abrirCompra(item);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vitrine, itemDaUrl]);
 
   function abrirModal() {
     setEstado('idle'); setTxHash(''); setErroMsg('');
@@ -1215,6 +1237,35 @@ export default function HomePage() {
                     </div>
                     <span className="text-[10px] text-white/20 font-mono">#{item.id}</span>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const base = `${window.location.origin}${window.location.pathname}`;
+                      const refPart = isConnected && walletAddress ? `ref=${walletAddress}&` : '';
+                      const url = `${base}?${refPart}item=${item.id}`;
+                      void navigator.clipboard.writeText(url).then(() => {
+                        setCopiedAffId(item.id);
+                        setTimeout(() => setCopiedAffId(null), 2000);
+                      });
+                    }}
+                    className="w-full py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-200 flex items-center justify-center gap-1.5"
+                    style={{
+                      fontFamily: "'Orbitron', sans-serif",
+                      background: copiedAffId === item.id
+                        ? 'rgba(74,222,128,0.12)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: copiedAffId === item.id
+                        ? '1px solid rgba(74,222,128,0.4)'
+                        : '1px solid rgba(255,255,255,0.08)',
+                      color: copiedAffId === item.id ? '#4ade80' : 'rgba(255,255,255,0.35)',
+                    }}
+                  >
+                    {copiedAffId === item.id ? (
+                      <>{lang === 'en' ? '✓ Link copied!' : '✓ Link copiado!'}</>
+                    ) : (
+                      <>{lang === 'en' ? '🔗 Affiliate Link' : '🔗 Link de Afiliado'}</>
+                    )}
+                  </button>
                   <button
                     className={`btn-neon btn-neon-full ${isPro ? 'btn-neon-gold' : 'btn-neon-cyan'}`}
                     onClick={() => abrirCompra(item)}
