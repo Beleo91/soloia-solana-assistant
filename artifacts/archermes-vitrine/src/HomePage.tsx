@@ -13,7 +13,7 @@ import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import StoreView, { type StoreItem } from './StoreView';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
-import { uploadImages, resolveImgUrl } from './imageUploader';
+import { uploadImages, resolveImgUrl, saveImageMap, syncImageMapToStorage } from './imageUploader';
 import { useVitrineSync, broadcastVitrineEvent } from './vitrineSync';
 import './Home.css';
 
@@ -446,6 +446,8 @@ export default function HomePage() {
     setCarregandoVitrine(true);
     setErroVitrine('');
     setItemImageErrors({});
+    // Seed localStorage with hosted image URLs from the API server so ALL clients see images
+    await syncImageMapToStorage();
 
     const TIMEOUT_MS = 15_000;
     function withTimeout<T>(p: Promise<T>): Promise<T> {
@@ -670,12 +672,14 @@ export default function HomePage() {
       const precoWei = parseUnits(form.preco, 18);
       const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria);
       await tx.wait();
-      // Salvar imagens no localStorage keyed pelo novo ID do item
+      // Salvar imagens no localStorage E no servidor (para outros clientes verem)
       if (formImagesBase64.length > 0) {
         try {
           const newTotal: bigint = await contrato.totalItems();
           const newId = Number(newTotal);
           localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(formImagesBase64));
+          // Push hosted URLs to the API image-map so all clients can load them
+          void saveImageMap(newId, formImagesBase64);
         } catch { /* ignore */ }
       }
       setTxHash(tx.hash);

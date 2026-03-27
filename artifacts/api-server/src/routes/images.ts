@@ -8,12 +8,6 @@ const router = Router();
 const UPLOADS_DIR = join(process.cwd(), 'uploads');
 if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 
-function getBaseUrl(req: Request): string {
-  const proto = (req.headers['x-forwarded-proto'] as string | undefined) ?? 'http';
-  const host = (req.headers['x-forwarded-host'] as string | undefined) ?? req.headers.host ?? 'localhost';
-  return `${proto}://${host}`;
-}
-
 router.post('/images/upload', (req: Request, res: Response) => {
   const { image } = req.body as { image?: unknown };
 
@@ -49,8 +43,10 @@ router.post('/images/upload', (req: Request, res: Response) => {
     return;
   }
 
-  const url = `${getBaseUrl(req)}/uploads/${filename}`;
-  res.json({ url });
+  // Return a root-relative path so the frontend can prefix it with the correct
+  // public base URL (window.location.origin + previewPath). This avoids any
+  // ambiguity about which headers the reverse-proxy passes.
+  res.json({ url: `/uploads/${filename}` });
 });
 
 export default router;
