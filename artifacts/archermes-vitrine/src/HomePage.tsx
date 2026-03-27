@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEvent } from 'react';
-import { BrowserProvider, Contract, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
+import { BrowserProvider, Contract, Interface, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { useWallet } from './walletContext';
 import { useLang } from './i18n';
 import { arcTestnet } from './chains';
@@ -38,6 +38,18 @@ interface ItemBlockchain {
   seller: string;
   images?: string[];
   currency?: Moeda;
+}
+
+interface ItemComprado {
+  id: number;
+  itemName: string;
+  priceEth: string;
+  category: string;
+  seller: string;
+  buyer: string;
+  isSold: boolean;
+  isDelivered: boolean;
+  isRefunded: boolean;
 }
 
 const MOCK_ITEM_CURRENCY: Record<number, StablecoinSymbol> = {
@@ -420,6 +432,16 @@ export default function HomePage() {
   const [buyErro, setBuyErro] = useState('');
   const [buyTx, setBuyTx] = useState('');
 
+  // Escrow / Compra Segura
+  const [escrowAtivo, setEscrowAtivo] = useState(true);
+
+  // Minhas Compras (histórico do comprador)
+  const [showMinhasCompras, setShowMinhasCompras] = useState(false);
+  const [minhasCompras, setMinhasCompras] = useState<ItemComprado[]>([]);
+  const [carregandoCompras, setCarregandoCompras] = useState(false);
+  const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
+  const [confirmErro, setConfirmErro] = useState<Record<number, string>>({});
+
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
     setErroVitrine('');
@@ -545,6 +567,69 @@ export default function HomePage() {
     }, 800);
   });
 
+  // ── MINHAS COMPRAS ──
+  const carregarMinhasCompras = useCallback(async () => {
+    if (!walletAddress) return;
+    setCarregandoCompras(true);
+    try {
+      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const iface = new Interface(CONTRACT_ABI);
+      const buyerTopic = '0x' + walletAddress.slice(2).toLowerCase().padStart(64, '0');
+      const eventFragment = iface.getEvent('ItemBought');
+      if (!eventFragment) throw new Error('Event not found');
+      const logs = await provider.getLogs({
+        address: CONTRACT_ADDRESS,
+        topics: [eventFragment.topicHash, null, buyerTopic],
+        fromBlock: 0,
+        toBlock: 'latest',
+      });
+      const ids = logs.map((l) => {
+        const parsed = iface.parseLog({ topics: [...l.topics], data: l.data });
+        return Number(parsed!.args[0] as bigint);
+      });
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const compras = await Promise.all(
+        ids.map(async (id) => {
+          const it = await contrato.items(id);
+          return {
+            id,
+            itemName: it.itemName as string,
+            priceEth: formatUnits(it.price as bigint, 18),
+            category: it.category as string,
+            seller: it.seller as string,
+            buyer: it.buyer as string,
+            isSold: it.isSold as boolean,
+            isDelivered: it.isDelivered as boolean,
+            isRefunded: it.isRefunded as boolean,
+          } satisfies ItemComprado;
+        })
+      );
+      setMinhasCompras(compras.filter((c) => c.isSold));
+    } catch { /* ignore */ }
+    setCarregandoCompras(false);
+  }, [walletAddress]);
+
+  async function handleConfirmarRecebimento(id: number) {
+    if (!isConnected) return;
+    setConfirmandoId(id);
+    setConfirmErro((p) => ({ ...p, [id]: '' }));
+    try {
+      await switchToArc();
+      const provider = getProvider();
+      if (!provider) throw new Error('No provider');
+      const signer = await provider.getSigner();
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const tx = await contrato.confirmDelivery(id);
+      await tx.wait();
+      await carregarMinhasCompras();
+      broadcastVitrineEvent({ type: 'product:sold', id });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setConfirmErro((p) => ({ ...p, [id]: msg.slice(0, 100) }));
+    }
+    setConfirmandoId(null);
+  }
+
   // Auto-abrir modal de compra quando URL contém ?item=ID
   useEffect(() => {
     if (!itemDaUrl || vitrine.length === 0) return;
@@ -568,6 +653,13 @@ export default function HomePage() {
   async function handlePublicar(e: React.FormEvent) {
     e.preventDefault();
     setEstado('enviando'); setErroMsg('');
+    // Verificar limite do plano grátis (10 produtos)
+    const minhaLojaReg = lojasReais.find((s) => s.address.toLowerCase() === walletAddress?.toLowerCase());
+    if (minhaLojaReg && minhaLojaReg.tier === 0 && minhaLojaReg.productCount >= 10) {
+      setErroMsg(t('pro.limitReached'));
+      setEstado('erro');
+      return;
+    }
     try {
       if (!isConnected) { setEstado('sem-carteira'); return; }
       await switchToArc();
@@ -1057,6 +1149,111 @@ export default function HomePage() {
         <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </section>
 
+      {/* ── MINHAS COMPRAS ── */}
+      {isConnected && walletAddress && (
+        <section className="mb-8 px-4 sm:px-0">
+          <div className="rounded-2xl border border-white/10 overflow-hidden"
+            style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <button
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
+              onClick={() => {
+                setShowMinhasCompras((v) => {
+                  if (!v) void carregarMinhasCompras();
+                  return !v;
+                });
+              }}>
+              <span className="text-sm font-black tracking-widest uppercase"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: '#c084fc' }}>
+                {t('purchases.show')}
+              </span>
+              <span className="text-white/30 text-xs tracking-widest">
+                {showMinhasCompras ? t('purchases.hide') : '▼'}
+              </span>
+            </button>
+
+            {showMinhasCompras && (
+              <div className="border-t border-white/5 px-5 pb-5">
+                {carregandoCompras ? (
+                  <div className="flex items-center gap-3 py-8 text-white/30">
+                    <div className="w-5 h-5 rounded-full border-2 border-purple-400 border-t-transparent animate-spin" />
+                    <span className="text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      {t('purchases.loading')}
+                    </span>
+                  </div>
+                ) : minhasCompras.length === 0 ? (
+                  <p className="text-white/20 text-xs py-8 text-center tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    {t('purchases.empty')}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-3 mt-4">
+                    {minhasCompras.map((compra) => (
+                      <div key={compra.id} className="rounded-xl border border-white/10 p-4 flex flex-col gap-3"
+                        style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-mono text-white/20">#{compra.id}</span>
+                              {compra.isRefunded && (
+                                <span className="text-[9px] bg-yellow-500/10 border border-yellow-400/30 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                  {t('purchases.refunded')}
+                                </span>
+                              )}
+                              {compra.isDelivered && !compra.isRefunded && (
+                                <span className="text-[9px] bg-green-500/10 border border-green-400/30 text-green-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                  {t('purchases.delivered')}
+                                </span>
+                              )}
+                              {!compra.isDelivered && !compra.isRefunded && (
+                                <span className="text-[9px] bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                  {t('purchases.pending')}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-bold text-white truncate" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                              {compra.itemName}
+                            </p>
+                            <p className="text-white/30 text-[10px] font-mono mt-0.5">
+                              {t('vitrine.seller')} {abreviarEndereco(compra.seller)}
+                            </p>
+                          </div>
+                          <span className="text-cyan-400 font-black text-sm flex-shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                            {parseFloat(compra.priceEth).toFixed(4)} ETH
+                          </span>
+                        </div>
+
+                        {!compra.isDelivered && !compra.isRefunded && (
+                          <div className="flex flex-col gap-2">
+                            <button
+                              onClick={() => void handleConfirmarRecebimento(compra.id)}
+                              disabled={confirmandoId === compra.id}
+                              className="btn-neon btn-neon-full"
+                              style={{ borderColor: '#4ade80', color: confirmandoId === compra.id ? '#ffffff50' : '#4ade80', background: 'rgba(74,222,128,0.05)', fontSize: '0.7rem' }}>
+                              {confirmandoId === compra.id ? t('purchases.confirming') : t('purchases.confirmBtn')}
+                            </button>
+                            {confirmErro[compra.id] && (
+                              <p className="text-red-400 text-[10px]">{confirmErro[compra.id]}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Suporte / Disputa */}
+                    <div className="rounded-xl border border-white/5 p-4 flex flex-col gap-1 mt-2"
+                      style={{ background: 'rgba(255,255,255,0.015)' }}>
+                      <p className="text-white/30 text-[10px] tracking-wide">{t('purchases.dispute')}</p>
+                      <a href="mailto:leosoares482@gmail.com" className="text-purple-400 text-[11px] font-bold hover:text-purple-300 transition-colors">
+                        leosoares482@gmail.com
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* ── VITRINE ── */}
       <section className="vitrine-container">
         <div className="flex items-center justify-between mb-6">
@@ -1509,6 +1706,35 @@ export default function HomePage() {
                       <span className="ml-auto text-green-400/60 text-[10px]">{t('modal.buy.affiliateCommission')}</span>
                     </div>
                   )}
+
+                  {/* Compra Segura toggle */}
+                  {(() => {
+                    const cur = itemParaComprar.currency ?? 'ETH';
+                    const isEth = cur === 'ETH';
+                    return (
+                      <div className={`rounded-xl border p-3 flex items-start gap-3 ${isEth ? 'border-cyan-400/25' : 'border-white/10'}`}
+                        style={{ background: isEth ? 'rgba(0,229,255,0.04)' : 'rgba(255,255,255,0.02)' }}>
+                        <span className="text-lg mt-0.5">🔒</span>
+                        <div className="flex-1">
+                          <p className="text-[11px] font-bold tracking-widest mb-0.5"
+                            style={{ fontFamily: "'Orbitron', sans-serif", color: isEth ? '#00e5ff' : '#ffffff60' }}>
+                            {t('escrow.toggle')}
+                          </p>
+                          <p className="text-white/30 text-[10px] leading-relaxed">
+                            {isEth ? t('escrow.desc') : t('escrow.usdc')}
+                          </p>
+                        </div>
+                        {isEth && (
+                          <button
+                            onClick={() => setEscrowAtivo((v) => !v)}
+                            className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors ${escrowAtivo ? 'bg-cyan-400' : 'bg-white/15'}`}
+                            aria-label="Toggle escrow">
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${escrowAtivo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <button onClick={confirmarCompra} className="btn-publicar" style={{ marginTop: '0.5rem' }}>
                     {t('modal.buy.confirm')}

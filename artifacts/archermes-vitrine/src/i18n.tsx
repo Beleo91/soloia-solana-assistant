@@ -206,6 +206,35 @@ const translations = {
     'wallet.noAccounts': 'No account authorized.',
     'wallet.error': 'Wallet connection error. Try again.',
 
+    /* ── ESCROW / SAFE PURCHASE ── */
+    'escrow.toggle': '🔒 Safe Purchase (Free)',
+    'escrow.desc': 'Payment held by smart contract — released only when you confirm receipt',
+    'escrow.usdc': 'Note: Safe Purchase applies to ARC/ETH payments only. Stablecoin payments are sent directly.',
+
+    /* ── MY PURCHASES ── */
+    'purchases.title': '🛍 My Purchases',
+    'purchases.empty': 'No purchases found on this wallet.',
+    'purchases.confirmBtn': '✓ Confirm Receipt',
+    'purchases.confirming': 'Confirming...',
+    'purchases.confirmed': '✓ Confirmed',
+    'purchases.delivered': '✓ Delivered',
+    'purchases.refunded': '↩ Refunded',
+    'purchases.pending': 'Awaiting confirmation',
+    'purchases.loading': 'Loading purchases...',
+    'purchases.dispute': 'Problem with your order? Contact support:',
+    'purchases.show': '🛍 My Purchases',
+    'purchases.hide': 'Hide',
+
+    /* ── PRO PLAN LIMIT ── */
+    'pro.limitReached': 'Free plan: 10 product limit reached. Upgrade to Pro for unlimited listings.',
+    'pro.badge': '⭐ PRO',
+    'pro.upgrading': 'Upgrading to Pro...',
+    'pro.upgraded': '⭐ Upgrade successful! Welcome to Pro.',
+    'pro.upgradeFailed': 'Upgrade failed. Try again.',
+    'dash.productLimit': 'of 10 (free plan)',
+    'dash.productLimitPro': 'products (unlimited)',
+    'dash.upgradeSuccess': '⭐ Now on Pro plan!',
+
     /* ── LANG TOGGLE ── */
     'lang.toggle': 'PT',
   },
@@ -410,6 +439,35 @@ const translations = {
     'wallet.noWallet': 'Nenhuma carteira Web3 detectada. Instale MetaMask ou Rabby.',
     'wallet.noAccounts': 'Nenhuma conta autorizada.',
     'wallet.error': 'Erro ao conectar carteira. Tente novamente.',
+
+    /* ── ESCROW / COMPRA SEGURA ── */
+    'escrow.toggle': '🔒 Compra Segura (Grátis)',
+    'escrow.desc': 'Pagamento travado no contrato — liberado só quando você confirmar o recebimento',
+    'escrow.usdc': 'Obs: Compra Segura funciona apenas para pagamentos ARC/ETH. Stablecoins vão direto ao vendedor.',
+
+    /* ── MINHAS COMPRAS ── */
+    'purchases.title': '🛍 Minhas Compras',
+    'purchases.empty': 'Nenhuma compra encontrada nesta carteira.',
+    'purchases.confirmBtn': '✓ Confirmar Recebimento',
+    'purchases.confirming': 'Confirmando...',
+    'purchases.confirmed': '✓ Confirmado',
+    'purchases.delivered': '✓ Entregue',
+    'purchases.refunded': '↩ Reembolsado',
+    'purchases.pending': 'Aguardando confirmação',
+    'purchases.loading': 'Carregando compras...',
+    'purchases.dispute': 'Problema com seu pedido? Entre em contato:',
+    'purchases.show': '🛍 Minhas Compras',
+    'purchases.hide': 'Ocultar',
+
+    /* ── PLANO PRO ── */
+    'pro.limitReached': 'Plano grátis: limite de 10 produtos atingido. Faça upgrade para Pro e anuncie ilimitado.',
+    'pro.badge': '⭐ PRO',
+    'pro.upgrading': 'Fazendo upgrade para Pro...',
+    'pro.upgraded': '⭐ Upgrade realizado! Bem-vindo ao Pro.',
+    'pro.upgradeFailed': 'Upgrade falhou. Tente novamente.',
+    'dash.productLimit': 'de 10 (plano grátis)',
+    'dash.productLimitPro': 'produtos (ilimitado)',
+    'dash.upgradeSuccess': '⭐ Agora no plano Pro!',
 
     /* ── LANG TOGGLE ── */
     'lang.toggle': 'EN',

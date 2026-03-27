@@ -99,6 +99,8 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
   const [boostTxHash, setBoostTxHash] = useState('');
   const [boostErro, setBoostErro] = useState('');
 
+  const [upgradeEstado, setUpgradeEstado] = useState<'idle' | 'processando' | 'sucesso' | 'erro'>('idle');
+
   const enderecoUsuario = walletAddress ?? '';
 
   // Carregar customização do localStorage
@@ -365,9 +367,10 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
 
   async function handleUpgradePro() {
     if (!isConnected) return;
+    setUpgradeEstado('processando');
     try {
       await switchToArc();
-      const provider = getProvider(); if (!provider) return;
+      const provider = getProvider(); if (!provider) throw new Error('No provider');
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
       const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -375,8 +378,12 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
       const taxa = await c2.proStoreFee();
       const tx = await contrato.upgradeToPro({ value: taxa });
       await tx.wait();
+      setUpgradeEstado('sucesso');
       setCarregando(true);
-    } catch (err) { console.error(err); }
+    } catch {
+      setUpgradeEstado('erro');
+      setTimeout(() => setUpgradeEstado('idle'), 4000);
+    }
   }
 
   async function handleRenovar() {
@@ -638,11 +645,24 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
 
                 {/* Ações */}
                 <div className="flex flex-col gap-3">
-                  {loja!.tier === 0 && (
+                  {loja!.tier === 0 && upgradeEstado !== 'sucesso' && (
                     <button onClick={handleUpgradePro}
-                      className="btn-neon btn-neon-filled-gold btn-neon-full btn-neon-lg">
-                      {t('dash.upgradePro')} {proFee} ETH
+                      disabled={upgradeEstado === 'processando'}
+                      className="btn-neon btn-neon-filled-gold btn-neon-full btn-neon-lg"
+                      style={{ opacity: upgradeEstado === 'processando' ? 0.6 : 1 }}>
+                      {upgradeEstado === 'processando' ? t('pro.upgrading') : `${t('dash.upgradePro')} ${proFee} ETH`}
                     </button>
+                  )}
+                  {upgradeEstado === 'sucesso' && (
+                    <div className="rounded-xl border border-yellow-400/30 px-4 py-3 text-center"
+                      style={{ background: 'rgba(251,191,36,0.08)' }}>
+                      <p className="text-yellow-400 font-bold text-sm tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        {t('dash.upgradeSuccess')}
+                      </p>
+                    </div>
+                  )}
+                  {upgradeEstado === 'erro' && (
+                    <p className="text-red-400 text-xs text-center">{t('pro.upgradeFailed')}</p>
                   )}
                   <button onClick={handleRenovar} className="btn-neon btn-neon-cyan btn-neon-full">
                     {t('dash.renew')}
@@ -656,10 +676,18 @@ export default function StoreDashboard({ onVoltar }: { onVoltar: () => void }) {
           {abaAtiva === 'produtos' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-black tracking-widest uppercase"
-                  style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                  {t('dash.myProducts')}
-                </h3>
+                <div>
+                  <h3 className="text-sm font-black tracking-widest uppercase"
+                    style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                    {t('dash.myProducts')}
+                  </h3>
+                  {loja && (
+                    <p className="text-[10px] mt-0.5"
+                      style={{ color: loja.tier === 0 && Number(loja.productCount) >= 8 ? '#f87171' : 'rgba(255,255,255,0.25)' }}>
+                      {Number(loja.productCount)} {loja.tier === 0 ? t('dash.productLimit') : t('dash.productLimitPro')}
+                    </p>
+                  )}
+                </div>
                 <button onClick={carregarMeusProdutos}
                   className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
                   style={{ fontFamily: "'Orbitron', sans-serif" }}>

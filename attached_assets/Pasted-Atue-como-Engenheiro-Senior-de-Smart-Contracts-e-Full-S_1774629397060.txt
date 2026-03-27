@@ -1,0 +1,30 @@
+Atue como Engenheiro Senior de Smart Contracts e Full-Stack Web3. Vamos escalar a plataforma ARCHERMES implementando três novas mecânicas de negócio: Sistema de Afiliados, Assinatura Pro e Escrow Gratuito.
+
+Tarefa 1: Programa de Afiliados On-Chain (Revenue Split)
+No componente de Produto (ProductCard ou página do produto), adicione um botão 'Gerar Link de Afiliado'.
+
+A URL gerada deve conter o endereço da carteira do usuário como parâmetro (ex: ?ref=0x...).
+
+Atualize a função de compra no Smart Contract para identificar se existe um afiliado. Se sim, o contrato deve dividir o pagamento automaticamente: uma porcentagem para o lojista, uma para a Treasury da plataforma (0x434189487484F20B9Bf0e0c28C1559B0c961274B) e uma comissão para a carteira do afiliado.
+
+Tarefa 2: Plano 'Merchant Pro' (SaaS Web3)
+Implemente uma lógica de 'Tier' para as Lojas.
+
+Plano Gratuito: Limite de 10 produtos listados por loja.
+
+Plano Pro (15 USDC/mês): Produtos ilimitados, habilita o upload de capa/banner personalizado e adiciona um 'Selo de Verificação Dourado' ao lado do nome da loja.
+
+Crie o botão/modal para o lojista fazer o upgrade pagando os 15 USDC via contrato inteligente.
+
+Tarefa 3: 'Compra Segura' Opcional (Free Escrow System)
+No momento do checkout, adicione um toggle switch (botão de ativar/desativar) escrito: 'Compra Segura (Grátis) - O pagamento só é liberado quando você receber o produto'.
+
+Lógica do Contrato (Escrow): Se ativado, o USDC pago não vai direto para o lojista. Fica travado no contrato inteligente da ARCHERMES.
+
+Liberação Comum: Adicione um botão 'Mercadoria Recebida' no painel de compras do usuário. Ao clicar, o contrato libera o dinheiro para o lojista.
+
+Resolução de Disputas (Admin Override): Adicione uma função no contrato onde APENAS a carteira Admin (Owner: 0x434189487484F20B9Bf0e0c28C1559B0c961274B) pode forçar a liberação dos fundos para o lojista em caso de disputa (ex: comprador não clica, mas o correio confirma entrega).
+
+Na interface de ajuda/disputa, mostre o e-mail de contato do suporte oficial: leosoares482@gmail.com.
+
+Implemente essas atualizações de UI e prepare as bases da lógica de contrato agora. Retorne um resumo do que foi alterado.
