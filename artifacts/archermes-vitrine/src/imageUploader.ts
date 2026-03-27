@@ -1,109 +1,91 @@
-const IMGBB_KEY = (import.meta.env.VITE_IMGBB_API_KEY as string | undefined) ?? '';
-
 /**
- * Derives the API server base URL at runtime from the current page's origin,
- * since both the vitrine (/) and API server (/api) share the same Replit domain.
- * Falls back to the build-time VITE_API_URL env var only when it looks like a
- * properly configured external URL (not the placeholder).
+ * imageUploader.ts — Cloud Media Pipeline
+ *
+ * All images are uploaded via the API server, which proxies them to ImgBB and
+ * returns a permanent, publicly-accessible CDN URL (https://i.ibb.co/...).
+ *
+ * Only absolute https:// URLs are ever stored in localStorage or the image-map.
+ * base64 blobs and relative paths are treated as fallbacks / errors only.
  */
+
 function getApiUrl(): string {
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/api`;
-  }
-  const envUrl = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '');
-  if (envUrl && !envUrl.includes('your-replit') && envUrl.startsWith('https://')) {
-    return `${envUrl}/api`;
   }
   return '';
 }
 
 export type UploadResult =
-  | { ok: true; url: string; hosted: boolean }
+  | { ok: true;  url: string; hosted: true }
   | { ok: false; url: string; hosted: false };
 
-async function uploadToApiServer(base64DataUrl: string): Promise<string | null> {
+/**
+ * Upload a single base64 data-URL image through the API server → ImgBB.
+ * Returns the permanent CDN URL on success, or a failure object.
+ */
+export async function uploadImage(base64DataUrl: string): Promise<UploadResult> {
   const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
+  if (!apiUrl) {
+    console.warn('[imageUploader] No API URL — cannot upload image');
+    return { ok: false, url: '', hosted: false };
+  }
+
   try {
     const res = await fetch(`${apiUrl}/images/upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: base64DataUrl }),
     });
+
     if (!res.ok) {
-      console.warn('[imageUploader] API server returned', res.status);
-      return null;
+      const err = await res.text().catch(() => '');
+      console.warn('[imageUploader] Upload failed:', res.status, err);
+      return { ok: false, url: '', hosted: false };
     }
-    const json = (await res.json()) as { url?: string };
-    const raw = json.url ?? null;
-    if (!raw) return null;
-    // API now returns a root-relative path ("/uploads/xxx.png").
-    // Prepend the API base so we always get a fully-qualified public URL.
-    if (raw.startsWith('/')) return `${apiUrl}${raw}`;
-    return raw;
-  } catch (err) {
-    console.warn('[imageUploader] API server upload failed:', err);
-    return null;
-  }
-}
 
-async function uploadToImgbb(base64DataUrl: string): Promise<string | null> {
-  try {
-    const base64 = base64DataUrl.includes(',')
-      ? base64DataUrl.split(',')[1]
-      : base64DataUrl;
-    const formData = new FormData();
-    formData.append('image', base64!);
-    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
-      method: 'POST',
-      body: formData,
-    });
-    if (!res.ok) {
-      console.warn('[imageUploader] Imgbb returned', res.status);
-      return null;
+    const json = (await res.json()) as { url?: string; error?: string };
+    const url = json.url ?? '';
+
+    if (!url.startsWith('http')) {
+      console.warn('[imageUploader] Server returned non-absolute URL:', url);
+      return { ok: false, url: '', hosted: false };
     }
-    const json = (await res.json()) as { data?: { display_url?: string; url?: string } };
-    return json.data?.display_url ?? json.data?.url ?? null;
+
+    return { ok: true, url, hosted: true };
   } catch (err) {
-    console.warn('[imageUploader] Imgbb upload failed:', err);
-    return null;
+    console.warn('[imageUploader] Upload error:', err);
+    return { ok: false, url: '', hosted: false };
   }
 }
 
-export async function uploadImage(base64DataUrl: string): Promise<UploadResult> {
-  const apiUrl = getApiUrl();
-  if (apiUrl) {
-    const url = await uploadToApiServer(base64DataUrl);
-    if (url) return { ok: true, url, hosted: true };
-  }
-
-  if (IMGBB_KEY) {
-    const url = await uploadToImgbb(base64DataUrl);
-    if (url) return { ok: true, url, hosted: true };
-  }
-
-  // Last resort: return the raw base64 (local-only, won't be visible to other users)
-  return { ok: true, url: base64DataUrl, hosted: false };
-}
-
+/**
+ * Upload multiple images in parallel.
+ * Returns only the successfully uploaded absolute URLs.
+ */
 export async function uploadImages(base64DataUrls: string[]): Promise<string[]> {
-  return Promise.all(base64DataUrls.map(async (b64) => {
-    const result = await uploadImage(b64);
-    return result.url;
-  }));
+  const results = await Promise.all(base64DataUrls.map(uploadImage));
+  return results.filter((r) => r.ok && r.url).map((r) => r.url);
 }
 
+/** True only for permanent hosted URLs (https://). */
 export const isHostedUrl = (url: string): boolean =>
-  url.startsWith('http://') || url.startsWith('https://');
+  typeof url === 'string' && url.startsWith('https://');
 
-export const resolveImgUrl = (url: string): string => {
-  if (!url) return url;
-  // Relative paths from old API builds: prefix with current API URL
-  if (url.startsWith('/') && !url.startsWith('//')) {
-    return `${getApiUrl()}${url}`;
-  }
-  return url;
-};
+/**
+ * Resolve any stored image URL to a displayable src.
+ * - Absolute https:// URLs → returned as-is (ideal path).
+ * - Legacy relative paths  → prefixed with current API base URL (migration compat).
+ * - Empty / base64 blobs   → return empty string (triggers placeholder fallback).
+ */
+export function resolveImgUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  // Legacy: root-relative path saved by old API builds
+  if (url.startsWith('/')) return `${getApiUrl()}${url}`;
+  // base64 blob — local only, don't surface to other clients
+  if (url.startsWith('data:')) return '';
+  return '';
+}
 
 /** Push item→urls mapping to the API server so all clients can see images. */
 export async function saveImageMap(itemId: number, urls: string[]): Promise<void> {
@@ -124,8 +106,7 @@ export async function saveImageMap(itemId: number, urls: string[]): Promise<void
 
 /**
  * Fetch all item image mappings from the API server and seed localStorage.
- * The server is the source of truth — its URLs always overwrite stale local entries
- * (old base64 blobs, old broken absolute URLs without the /api/ prefix, etc.).
+ * The server is the source of truth — its URLs always overwrite stale local entries.
  * Returns true if at least one entry was updated (caller can trigger re-render).
  */
 export async function syncImageMapToStorage(): Promise<boolean> {
@@ -138,8 +119,11 @@ export async function syncImageMapToStorage(): Promise<boolean> {
     let updated = false;
     for (const [idStr, urls] of Object.entries(map)) {
       if (!Array.isArray(urls) || urls.length === 0) continue;
+      // Only persist absolute hosted URLs — skip any legacy blobs or relative paths
+      const clean = urls.filter(isHostedUrl);
+      if (clean.length === 0) continue;
       const key = `archermes_item_images_${idStr}`;
-      const next = JSON.stringify(urls);
+      const next = JSON.stringify(clean);
       if (localStorage.getItem(key) !== next) {
         localStorage.setItem(key, next);
         updated = true;

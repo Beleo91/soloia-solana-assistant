@@ -723,14 +723,19 @@ export default function HomePage() {
       const precoWei = parseUnits(form.preco, 18);
       const tx = await contrato.listItem(form.nomeItem, precoWei, form.categoria);
       await tx.wait();
-      // Salvar imagens no localStorage E no servidor (para outros clientes verem)
+      // Persist hosted image URLs for this new listing.
+      // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded
+      // eagerly when the user selected the files). Filter to only hosted URLs to
+      // be safe, then push to the API image-map so ALL clients see the images.
       if (formImagesBase64.length > 0) {
         try {
           const newTotal: bigint = await contrato.totalItems();
           const newId = Number(newTotal);
-          localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(formImagesBase64));
-          // Push hosted URLs to the API image-map so all clients can load them
-          void saveImageMap(newId, formImagesBase64);
+          const hostedUrls = formImagesBase64.filter((u) => u.startsWith('https://'));
+          if (hostedUrls.length > 0) {
+            localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(hostedUrls));
+            void saveImageMap(newId, hostedUrls);
+          }
         } catch { /* ignore */ }
       }
       setTxHash(tx.hash);
@@ -1649,9 +1654,13 @@ export default function HomePage() {
                         {formImages.map((file, idx) => (
                           <div key={idx} className="upload-thumb">
                             <img src={URL.createObjectURL(file)} alt={file.name} loading="lazy" />
-                            {formImagesBase64[idx] && (
-                              <span className="upload-thumb-saved" title="Imagem salva">✓</span>
-                            )}
+                            {formImagesBase64[idx]
+                              ? (
+                                <span className="upload-thumb-saved" title={lang === 'en' ? 'Hosted on ImgBB' : 'Hospedado no ImgBB'}>☁︎</span>
+                              ) : convertingImages ? (
+                                <span className="upload-thumb-saved" style={{ color: '#facc15' }}>⟳</span>
+                              ) : null
+                            }
                             <button
                               type="button"
                               className="upload-thumb-remove"

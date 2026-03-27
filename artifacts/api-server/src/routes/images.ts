@@ -1,14 +1,20 @@
 import { Router, type Request, type Response } from 'express';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
+import FormData from 'form-data';
+import fetch from 'node-fetch';
 
 const router = Router();
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads');
-if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+const IMGBB_KEY = process.env.IMGBB_API_KEY ?? '';
 
-router.post('/images/upload', (req: Request, res: Response) => {
+/**
+ * POST /images/upload
+ * Body: { image: "<base64 data URL>" }
+ * Returns: { url: "https://i.ibb.co/..." }
+ *
+ * Uploads the image directly to ImgBB so the returned URL is a permanent,
+ * publicly accessible CDN link — no local filesystem involved.
+ */
+router.post('/images/upload', async (req: Request, res: Response) => {
   const { image } = req.body as { image?: unknown };
 
   if (!image || typeof image !== 'string') {
@@ -16,37 +22,53 @@ router.post('/images/upload', (req: Request, res: Response) => {
     return;
   }
 
-  const match = image.match(/^data:([a-zA-Z0-9+/-]+);base64,(.+)$/s);
-  if (!match) {
-    res.status(400).json({ error: 'Invalid base64 data URL format' });
+  // Strip the data URL prefix (data:image/png;base64,...) — ImgBB wants raw base64
+  const base64 = image.includes(',') ? image.split(',')[1] : image;
+  if (!base64) {
+    res.status(400).json({ error: 'Could not parse base64 payload' });
     return;
   }
 
-  const [, mimeType, base64] = match as [string, string, string];
-  const extMap: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/gif': 'gif',
-    'image/webp': 'webp',
-    'image/avif': 'avif',
-  };
-  const ext = extMap[mimeType] ?? 'jpg';
-  const filename = `${randomUUID()}.${ext}`;
-  const filePath = join(UPLOADS_DIR, filename);
+  if (!IMGBB_KEY) {
+    res.status(503).json({ error: 'Image hosting not configured (IMGBB_API_KEY missing)' });
+    return;
+  }
 
   try {
-    writeFileSync(filePath, Buffer.from(base64, 'base64'));
-  } catch (err) {
-    console.error('[images] Failed to write file:', err);
-    res.status(500).json({ error: 'Failed to save image' });
-    return;
-  }
+    const form = new FormData();
+    form.append('image', base64);
 
-  // Return a root-relative path so the frontend can prefix it with the correct
-  // public base URL (window.location.origin + previewPath). This avoids any
-  // ambiguity about which headers the reverse-proxy passes.
-  res.json({ url: `/uploads/${filename}` });
+    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[images] ImgBB error', response.status, text);
+      res.status(502).json({ error: `ImgBB returned ${response.status}` });
+      return;
+    }
+
+    const json = (await response.json()) as {
+      data?: { display_url?: string; url?: string };
+      success?: boolean;
+    };
+
+    const url = json.data?.display_url ?? json.data?.url ?? null;
+    if (!url) {
+      console.error('[images] ImgBB response missing url:', json);
+      res.status(502).json({ error: 'ImgBB response did not include a URL' });
+      return;
+    }
+
+    console.log('[images] uploaded to ImgBB:', url);
+    res.json({ url });
+  } catch (err) {
+    console.error('[images] upload failed:', err);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
 });
 
 export default router;
