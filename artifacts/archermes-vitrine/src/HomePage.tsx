@@ -1064,6 +1064,7 @@ export default function HomePage() {
               {t('nav.affiliate')}
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStoreIcon')}</button>
+            <button onClick={abrirModal} className="btn-anunciar">{t('nav.list')}</button>
             <button onClick={disconnect} className="btn-sair">{t('nav.disconnect')}</button>
           </div>
         )}
