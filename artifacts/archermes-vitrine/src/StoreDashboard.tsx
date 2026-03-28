@@ -104,6 +104,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const [upgradeEstado, setUpgradeEstado] = useState<'idle' | 'processando' | 'sucesso' | 'erro'>('idle');
 
   const enderecoUsuario = walletAddress ?? '';
+  const isAdmin = enderecoUsuario.toLowerCase() === TREASURY_WALLET.toLowerCase();
 
   // Carregar customização do localStorage
   useEffect(() => {
@@ -271,7 +272,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
       // Admin (contract owner) pays no store fee — contract has admin bypass.
-      const isAdmin = enderecoUsuario.toLowerCase() === TREASURY_WALLET.toLowerCase();
       let taxa = 0n;
       if (!isAdmin) {
         const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -544,7 +544,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>{t('dash.basic')}</h3>
               </div>
               <p className="text-3xl font-black" style={{ color: '#00e5ff', fontFamily: "'Orbitron', sans-serif" }}>
-                {basicFee}<span className="text-base text-white/40 ml-1 font-normal">ETH</span>
+                {isAdmin ? <span className="text-green-400">GRÁTIS</span> : <>{basicFee}<span className="text-base text-white/40 ml-1 font-normal">ETH</span></>}
               </p>
               <ul className="flex flex-col gap-2 text-sm text-white/60">
                 <li className="flex items-center gap-2"><span className="text-cyan-400">✓</span> Até 10 produtos</li>
@@ -554,7 +554,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
               <button disabled={estado === 'criando'}
                 onClick={(e) => { e.stopPropagation(); setPlanoPro(false); handleCriarLoja(false); }}
                 className="btn-neon btn-neon-cyan btn-neon-full btn-neon-lg">
-                {estado === 'criando' && !planoPro ? '⟳ Processando...' : `Abrir por ${basicFee} ETH`}
+                {estado === 'criando' && !planoPro ? '⟳ Processando...' : isAdmin ? '⚡ Criar GRÁTIS' : `Abrir por ${basicFee} ETH`}
               </button>
             </div>
 
@@ -573,7 +573,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   style={{ fontFamily: "'Orbitron', sans-serif", color: '#fff' }}>PRO</h3>
               </div>
               <p className="text-3xl font-black" style={{ color: '#c084fc', fontFamily: "'Orbitron', sans-serif" }}>
-                {proFee}<span className="text-base text-white/40 ml-1 font-normal">ETH</span>
+                {isAdmin ? <span className="text-green-400">GRÁTIS</span> : <>{proFee}<span className="text-base text-white/40 ml-1 font-normal">ETH</span></>}
               </p>
               <ul className="flex flex-col gap-2 text-sm text-white/60">
                 <li className="flex items-center gap-2"><span className="text-purple-400">✓</span> Produtos ilimitados</li>
@@ -584,7 +584,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
               <button disabled={estado === 'criando'}
                 onClick={(e) => { e.stopPropagation(); setPlanoPro(true); handleCriarLoja(true); }}
                 className="btn-neon btn-neon-purple btn-neon-full btn-neon-lg">
-                {estado === 'criando' && planoPro ? '⟳ Processando...' : `PRO por ${proFee} ETH`}
+                {estado === 'criando' && planoPro ? '⟳ Processando...' : isAdmin ? '⚡ PRO GRÁTIS' : `PRO por ${proFee} ETH`}
               </button>
             </div>
           </div>
@@ -748,15 +748,15 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
                         padding: '0.45rem 1rem',
                         borderRadius: '999px',
-                        border: '1.5px solid rgba(0,229,255,0.5)',
-                        background: 'linear-gradient(135deg, rgba(0,229,255,0.12), rgba(0,229,255,0.04))',
-                        color: '#00e5ff',
+                        border: `1.5px solid ${customizacao.neonColor}80`,
+                        background: `linear-gradient(135deg, ${customizacao.neonColor}18, ${customizacao.neonColor}06)`,
+                        color: customizacao.neonColor,
                         fontFamily: "'Orbitron', sans-serif",
                         fontSize: '0.65rem',
                         fontWeight: 700,
                         letterSpacing: '0.1em',
                         cursor: 'pointer',
-                        boxShadow: '0 0 12px rgba(0,229,255,0.15)',
+                        boxShadow: `0 0 14px ${customizacao.neonColor}25`,
                         transition: 'all 0.2s ease',
                       }}>
                       <span style={{ fontSize: '0.85rem' }}>⚡</span>
@@ -780,10 +780,32 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
               )}
 
               {!carregandoProdutos && meusProdutos.length === 0 && (
-                <div className="flex flex-col items-center py-16 gap-3">
-                  <span className="text-4xl opacity-20">⬡</span>
+                <div className="flex flex-col items-center py-16 gap-5">
+                  <span className="text-5xl opacity-15">⬡</span>
                   <p className="text-white/30 text-xs tracking-widest uppercase"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.noProducts')}</p>
+                  {onAnunciar && (
+                    <button onClick={onAnunciar}
+                      style={{
+                        marginTop: '0.5rem',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        padding: '0.65rem 1.6rem',
+                        borderRadius: '999px',
+                        border: `1.5px solid ${customizacao.neonColor}80`,
+                        background: `linear-gradient(135deg, ${customizacao.neonColor}18, ${customizacao.neonColor}08)`,
+                        color: customizacao.neonColor,
+                        fontFamily: "'Orbitron', sans-serif",
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.12em',
+                        cursor: 'pointer',
+                        boxShadow: `0 0 20px ${customizacao.neonColor}20`,
+                        transition: 'all 0.2s ease',
+                      }}>
+                      <span style={{ fontSize: '1rem' }}>⚡</span>
+                      {lang === 'en' ? 'CREATE FIRST LISTING' : 'CRIAR PRIMEIRO ANÚNCIO'}
+                    </button>
+                  )}
                 </div>
               )}
 
