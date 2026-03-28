@@ -194,7 +194,11 @@ contract Archermes {
         }
 
         // ── Fee math ────────────────────────────────────────────────────────
-        uint256 platFee = (item.price * platformFeePercent) / 100;
+        // Owner/admin pays zero platform fee — avoids self-transfer and keeps
+        // the full item price in escrow for the seller.
+        uint256 platFee = (msg.sender != owner)
+            ? (item.price * platformFeePercent) / 100
+            : 0;
         bool validRef = (
             _referrer != address(0) &&
             _referrer != item.seller &&
@@ -203,7 +207,7 @@ contract Archermes {
         uint256 refFee   = validRef ? (item.price * referralFeePercent) / 100 : 0;
         uint256 escrowed = item.price - platFee - refFee;
 
-        if (msg.sender != owner && platFee > 0) {
+        if (platFee > 0) {
             owner.transfer(platFee);
         }
         if (refFee > 0 && validRef) {

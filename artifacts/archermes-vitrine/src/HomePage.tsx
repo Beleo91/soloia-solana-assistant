@@ -342,6 +342,9 @@ export default function HomePage() {
 
   const [modalAberto, setModalAberto] = useState(false);
   const [estado, setEstado] = useState<Estado>('idle');
+  // Tracks the brief background reload after a successful listing so the
+  // success modal can show a "updating…" spinner that resolves automatically.
+  const [postListReloading, setPostListReloading] = useState(false);
 
   // ── TOAST ──
   const [toast, setToast] = useState('');
@@ -789,7 +792,7 @@ export default function HomePage() {
     setFormEstoque(1);
     setModalAberto(true);
   }
-  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); setFormEstoque(1); }
+  function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); setFormEstoque(1); setPostListReloading(false); }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -820,12 +823,18 @@ export default function HomePage() {
       setEstado('erro'); return;
     }
 
-    // Verificar limite do plano grátis (10 produtos)
-    const minhaLojaReg = lojasReais.find((s) => s.address.toLowerCase() === walletAddress?.toLowerCase());
-    if (minhaLojaReg && minhaLojaReg.tier === 0 && minhaLojaReg.productCount >= 10) {
-      setErroMsg(t('pro.limitReached'));
-      setEstado('erro');
-      return;
+    // Admin wallet bypasses all tier/product-count restrictions
+    const ADMIN_ADDR = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
+    const isAdminWallet = walletAddress?.toLowerCase() === ADMIN_ADDR.toLowerCase();
+
+    // Verificar limite do plano grátis (10 produtos) — ignorado para admin
+    if (!isAdminWallet) {
+      const minhaLojaReg = lojasReais.find((s) => s.address.toLowerCase() === walletAddress?.toLowerCase());
+      if (minhaLojaReg && minhaLojaReg.tier < 1 && minhaLojaReg.productCount >= 10) {
+        setErroMsg(t('pro.limitReached'));
+        setEstado('erro');
+        return;
+      }
     }
     try {
       if (!isConnected) { setEstado('sem-carteira'); return; }
@@ -865,15 +874,18 @@ export default function HomePage() {
       }
       setTxHash(tx.hash);
       setEstado('sucesso');
+      // Show "Atualizando vitrine..." spinner only during the background reload.
+      setPostListReloading(true);
+
       // Arc Testnet RPC nodes can take 1-3 s to propagate a new block to eth_call.
-      // Fire a first reload after 2 s so the new product appears automatically,
-      // and a safety retry at 6 s in case of slower nodes.
-      const reloadAndBroadcast = () => {
+      // Fire a first reload after 2 s; safety retry at 6 s; resolve the spinner.
+      setTimeout(() => {
         carregarVitrine();
         broadcastVitrineEvent({ type: 'product:listed', id: 0 });
-      };
-      setTimeout(reloadAndBroadcast, 2000);
-      setTimeout(() => carregarVitrine(), 6000);
+      }, 2000);
+      setTimeout(() => {
+        void carregarVitrine().finally(() => setPostListReloading(false));
+      }, 6000);
     } catch (err: unknown) {
       setErroMsg(extractContractError(err));
       setEstado('erro');
@@ -2004,11 +2016,19 @@ export default function HomePage() {
                 <h2>{t('modal.list.success')}</h2>
                 <p><strong>{form.nomeItem}</strong> {t('modal.list.successDesc')}</p>
                 {txHash && <p className="contrato-info">TX: <code>{txHash.slice(0,12)}…{txHash.slice(-6)}</code></p>}
-                <div className="flex items-center justify-center gap-2 mt-1 mb-1"
-                  style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em' }}>
-                  <div className="w-3 h-3 rounded-full border border-cyan-400 border-t-transparent animate-spin" />
-                  {lang === 'en' ? 'Updating vitrine…' : 'Atualizando vitrine…'}
-                </div>
+                {postListReloading ? (
+                  <div className="flex items-center justify-center gap-2 mt-1 mb-1"
+                    style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em' }}>
+                    <div className="w-3 h-3 rounded-full border border-cyan-400 border-t-transparent animate-spin" />
+                    {lang === 'en' ? 'Updating vitrine…' : 'Atualizando vitrine…'}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-1 mt-1 mb-1"
+                    style={{ color: 'rgba(74,222,128,0.75)', fontSize: '0.7rem', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em' }}>
+                    <span style={{ fontSize: '0.85rem' }}>✓</span>
+                    {lang === 'en' ? 'Vitrine updated!' : 'Vitrine atualizada!'}
+                  </div>
+                )}
                 <button onClick={fecharModal} className="btn-publicar">{t('modal.list.close')}</button>
               </div>
             )}
