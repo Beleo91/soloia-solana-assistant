@@ -23,8 +23,8 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const TREASURY_WALLET = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
 /** Must stay in sync with on-chain platformFeePercent (currently 3). */
 const PLATFORM_FEE_PERCENT = 3n;
-/** Must stay in sync with on-chain referralFeePercent (currently 1). */
-const REFERRAL_FEE_PERCENT = 1n;
+/** Must stay in sync with on-chain referralFeePercent — v3 contract uses 2. */
+const REFERRAL_FEE_PERCENT = 2n;
 
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
 
@@ -843,19 +843,20 @@ export default function HomePage() {
       if (!provider) { setEstado('sem-carteira'); return; }
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      // ABI v2: listItem(name: string, price: uint256, category: string)  — 3 params
-      // TODO after v3 deploy: add stock as 4th param
+      // ABI v3: listItem(name: string, price: uint256, category: string, stock: uint256)
       const precoWei = parseUnits(precoStr, 18);
+      const estoque  = BigInt(Math.max(1, formEstoque));
       // ── Debug payload ──────────────────────────────────────────────────────
-      console.log('[ARCHERMES] listItem payload (v2 — 3 params):', {
+      console.log('[ARCHERMES] listItem payload (v3):', {
         nomeItem,
         precoStr,
         precoWei: precoWei.toString(),
         categoria: form.categoria,
+        estoque: estoque.toString(),
         contract: CONTRACT_ADDRESS,
         caller: await signer.getAddress(),
       });
-      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria);
+      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
       await tx.wait();
       // Persist hosted image URLs for this new listing.
       // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded

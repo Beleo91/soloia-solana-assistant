@@ -1,4 +1,5 @@
-export const CONTRACT_ADDRESS = '0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9';
+// v3 — deployed 2026-03-28 — tx 0x537a849c1a6d072ab5956189637870050862f705cf66aeac7f2a10708f5fec02
+export const CONTRACT_ADDRESS = '0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557';
 
 export const CONTRACT_ABI = [
   // ── Admin ────────────────────────────────────────────────────────────────
@@ -12,13 +13,12 @@ export const CONTRACT_ABI = [
   { inputs: [], name: 'upgradeToPro', outputs: [], stateMutability: 'payable', type: 'function' },
 
   // ── Listing ───────────────────────────────────────────────────────────────
-  // NOTE: v2 deployed contract uses 3-param listItem (no stock).
-  // Update to 4-param version after v3 deploy.
   {
     inputs: [
       { internalType: 'string',  name: '_itemName', type: 'string' },
       { internalType: 'uint256', name: '_price',    type: 'uint256' },
       { internalType: 'string',  name: '_category', type: 'string' },
+      { internalType: 'uint256', name: '_stock',    type: 'uint256' },
     ],
     name: 'listItem', outputs: [], stateMutability: 'nonpayable', type: 'function',
   },
@@ -68,8 +68,7 @@ export const CONTRACT_ABI = [
       { internalType: 'bool',            name: 'isDelivered', type: 'bool' },
       { internalType: 'bool',            name: 'isRefunded',  type: 'bool' },
       { internalType: 'bool',            name: 'isActive',    type: 'bool' },
-      // NOTE: stock field added in v3. Absent in v2 — will read as 0n (default).
-      // Re-enable after v3 deploy: { internalType: 'uint256', name: 'stock', type: 'uint256' },
+      { internalType: 'uint256',         name: 'stock',       type: 'uint256' },
     ],
     stateMutability: 'view', type: 'function',
   },

@@ -101,7 +101,8 @@ Utility scripts package. Each script is a `.ts` file in `src/` with a correspond
 Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript + Tailwind CSS v4.
 
 **Chain**: Arc Testnet (chainId 5042002), RPC: `https://rpc.testnet.arc.network`, Explorer: `https://testnet.arcscan.app`
-**Contract**: `0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9`
+**Contract v3**: `0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557` (deployed 2026-03-28, tx `0x537a849c1a6d072ab5956189637870050862f705cf66aeac7f2a10708f5fec02`, block 34300305)
+**Contract v2 (legacy)**: `0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9` (deprecated)
 **Auth**: Privy (`@privy-io/react-auth`)
 **Key files**:
 - `src/HomePage.tsx` — vitrine principal (Lojas Parceiras carousel, Produtos Impulsionados, product grid)
@@ -135,3 +136,8 @@ Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript 
 - `STABLECOIN_ADDRESSES` are placeholders (0x000...001 / 0x000...002) until real contracts deploy
 - "Invalid hook call" in console is pre-existing Privy/Coinbase connector issue, not a bug
 - Tailwind v4: layout-critical styles use custom CSS classes in `Home.css`
+- v3 contract has store subscription checks **disabled** (commented out in `listItem`) for open testing — re-enable before mainnet
+- Admin wallet `0x434189487484F20B9Bf0e0c28C1559B0c961274B` bypasses product-count checks in frontend; `platFee = 0` in `buyItem` on-chain when owner buys
+- `platformFeePercent = 3`, `referralFeePercent = 2` (synced in frontend constants)
+- Deployer wallet: `0xC87e5c146ed67625eAf90dD6B6780b22cb2f5a41` — used only for gas, no privileged role
+- v3 deploy scripts: `contracts/compile.cjs` (compile) → `contracts/deploy.js` (deploy, reads `DEPLOYER_PRIVATE_KEY`)
