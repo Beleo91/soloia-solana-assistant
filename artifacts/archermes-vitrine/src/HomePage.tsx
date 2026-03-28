@@ -13,6 +13,7 @@ import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import StoreView, { type StoreItem } from './StoreView';
 import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
+import { extractContractError } from './contractUtils';
 import { uploadImages, resolveImgUrl, saveImageMap, syncImageMapToStorage } from './imageUploader';
 import { useVitrineSync, broadcastVitrineEvent } from './vitrineSync';
 import './Home.css';
@@ -27,67 +28,6 @@ const PLATFORM_FEE_PERCENT = 3n;
 const REFERRAL_FEE_PERCENT = 2n;
 
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
-
-/**
- * Extracts the most meaningful error message from an ethers.js / MetaMask error.
- * Handles:
- *  - Contract revert reasons  (error.reason)
- *  - MetaMask JSON-RPC errors (error.info.error.message)
- *  - eth_estimateGas reverts  (error.data.message)
- *  - Standard Error objects
- */
-function extractContractError(err: unknown): string {
-  if (!err) return 'Unknown error';
-  const e = err as Record<string, unknown>;
-  // 0. ethers v6 CALL_EXCEPTION sem dados de revert ("missing revert data")
-  if (e.code === 'CALL_EXCEPTION') {
-    // Tenta extrair custom error ou revert reason dos dados
-    try {
-      const data = e.data as Record<string, unknown> | undefined;
-      if (data && typeof data.message === 'string' && data.message.length > 0) return data.message;
-    } catch { /* ignore */ }
-    return 'Transação rejeitada pelo contrato. Verifique se sua loja está ativa e com assinatura válida.';
-  }
-  // 1. ethers v6: `reason` field contains the decoded revert string
-  if (typeof e.reason === 'string' && e.reason.length > 0) return e.reason;
-  // 2. viem shortMessage (clean one-liner)
-  if (typeof e.shortMessage === 'string' && e.shortMessage.length > 0) return e.shortMessage;
-  // 3. MetaMask / Rabby wraps the original RPC error inside `info.error`
-  try {
-    const info = e.info as Record<string, unknown> | undefined;
-    if (info) {
-      const inner = info.error as Record<string, unknown> | undefined;
-      if (inner && typeof inner.message === 'string') return inner.message;
-      if (typeof info.message === 'string') return info.message;
-    }
-  } catch { /* ignore */ }
-  // 4. `data.message` sometimes carries the revert reason
-  try {
-    const data = e.data as Record<string, unknown> | undefined;
-    if (data && typeof data.message === 'string') return data.message;
-  } catch { /* ignore */ }
-  // 5. Standard JS Error — extract meaningful part
-  if (err instanceof Error) {
-    const m = err.message;
-    // ethers boilerplate: reason="..."
-    const rMatch = m.match(/reason="([^"]+)"/);
-    if (rMatch) return rMatch[1];
-    // viem pattern: "Details: <msg>  Version: ..."
-    const detailsMatch = m.match(/Details:\s*(.+?)(?:\s+Version:|$)/s);
-    if (detailsMatch) {
-      const detail = detailsMatch[1].trim();
-      if (detail.toLowerCase().includes('execution reverted'))
-        return 'Transação revertida pelo contrato. Verifique se sua loja está ativa e os dados estão corretos.';
-      return detail.length > 200 ? detail.slice(0, 200) + '…' : detail;
-    }
-    if (m.toLowerCase().includes('execution reverted'))
-      return 'Transação revertida pelo contrato. Verifique se sua loja está ativa e os dados estão corretos.';
-    if (m.toLowerCase().includes('missing revert data'))
-      return 'Transação rejeitada pelo contrato. Verifique se sua loja está ativa e com assinatura válida.';
-    return m.length > 200 ? m.slice(0, 200) + '…' : m;
-  }
-  return String(err).slice(0, 200);
-}
 
 type Moeda = 'ETH' | StablecoinSymbol;
 

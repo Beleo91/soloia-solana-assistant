@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent, type DragEvent } from 'react';
 import { BrowserProvider, Contract, JsonRpcProvider, formatUnits } from 'ethers';
 import { useWallet } from './walletContext';
 import { useLang } from './i18n';
@@ -6,6 +6,7 @@ import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import { saveStoreToRegistry, addBoostedProduct, getItemImages, getNeonShadow } from './registry';
 import { uploadImage } from './imageUploader';
+import { extractContractError } from './contractUtils';
 import { transferERC20, STABLECOIN_ADDRESSES, toTokenAmount } from './stablecoins';
 import { broadcastVitrineEvent } from './vitrineSync';
 
@@ -202,26 +203,25 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     if (e.dataTransfer.files?.[0]) void handleAvatarFile(e.dataTransfer.files[0]);
   }
 
-  // Checar loja
-  useEffect(() => {
-    async function checarLoja() {
-      if (!enderecoUsuario) { setCarregando(false); return; }
-      setCarregando(true);
-      try {
-        const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
-        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-        const [bFee, pFee, store] = await Promise.all([
-          contrato.basicStoreFee(),
-          contrato.proStoreFee(),
-          contrato.stores(enderecoUsuario),
-        ]);
-        setBasicFee(formatUnits(bFee, 18));
-        setProFee(formatUnits(pFee, 18));
-        setLoja({ storeName: store.storeName, expiresAt: store.expiresAt, tier: Number(store.tier), productCount: store.productCount });
-      } catch (err) { console.error(err); } finally { setCarregando(false); }
-    }
-    checarLoja();
+  // Checar loja — exposed as callable function so it can be called after mutations
+  const checarLoja = useCallback(async () => {
+    if (!enderecoUsuario) { setCarregando(false); return; }
+    setCarregando(true);
+    try {
+      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const [bFee, pFee, store] = await Promise.all([
+        contrato.basicStoreFee(),
+        contrato.proStoreFee(),
+        contrato.stores(enderecoUsuario),
+      ]);
+      setBasicFee(formatUnits(bFee, 18));
+      setProFee(formatUnits(pFee, 18));
+      setLoja({ storeName: store.storeName, expiresAt: store.expiresAt, tier: Number(store.tier), productCount: store.productCount });
+    } catch (err) { console.error(err); } finally { setCarregando(false); }
   }, [enderecoUsuario]);
+
+  useEffect(() => { void checarLoja(); }, [checarLoja]);
 
   // Carregar meus produtos
   const carregarMeusProdutos = async () => {
@@ -269,15 +269,24 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
-      const c2 = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
-      const taxa = isPro ? await c2.proStoreFee() : await c2.basicStoreFee();
+
+      // Admin (contract owner) pays no store fee — contract has admin bypass.
+      const isAdmin = enderecoUsuario.toLowerCase() === TREASURY_WALLET.toLowerCase();
+      let taxa = 0n;
+      if (!isAdmin) {
+        const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const c2 = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
+        taxa = isPro ? await c2.proStoreFee() : await c2.basicStoreFee();
+      }
+
+      console.log('[ARCHERMES] createStore:', { nome: nomeLoja.trim(), isPro, taxa: taxa.toString(), isAdmin });
       const tx = await contrato.createStore(nomeLoja.trim(), isPro, { value: taxa });
       await tx.wait();
       setEstado('sucesso');
+      // Reload store data after creation so UI reflects the new store immediately
+      setTimeout(() => { void checarLoja(); }, 1500);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setErroMsg(msg.length > 160 ? msg.slice(0, 160) + '…' : msg);
+      setErroMsg(extractContractError(err));
       setEstado('erro');
     }
   }
@@ -368,8 +377,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       broadcastVitrineEvent({ type: 'boost:changed' });
       setBoostEstado('sucesso');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setBoostErro(msg.length > 120 ? msg.slice(0, 120) + '…' : msg);
+      setBoostErro(extractContractError(err));
       setBoostEstado('erro');
     }
   }
