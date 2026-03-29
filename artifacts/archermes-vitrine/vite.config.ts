@@ -43,8 +43,17 @@ if (!isBuildMode && (Number.isNaN(port) || port <= 0)) {
 
 const basePath = process.env.BASE_PATH ?? '/';
 
+// ImgBB key: injected at build time so the browser can upload directly to ImgBB
+// without needing the API server as a proxy. Works in both Replit and Vercel —
+// just set IMGBB_API_KEY as an environment variable in either platform.
+const imgbbKey = process.env.IMGBB_API_KEY ?? '';
+
 export default defineConfig({
   base: basePath,
+  define: {
+    // Exposed as import.meta.env.VITE_IMGBB_API_KEY in all source files
+    'import.meta.env.VITE_IMGBB_API_KEY': JSON.stringify(imgbbKey),
+  },
   plugins: [
     react(),
     tailwindcss(),
