@@ -23,27 +23,25 @@ const wsErrorHandlerPlugin = (): Plugin => ({
   },
 });
 
+// During Vercel (or any CI) build, PORT and BASE_PATH are not set.
+// We only need them for the dev server — the build output doesn't use them.
+const isBuildMode = process.env.NODE_ENV === 'production' || !process.env.REPL_ID;
+
 const rawPort = process.env.PORT;
 
-if (!rawPort) {
+if (!rawPort && !isBuildMode) {
   throw new Error(
     "PORT environment variable is required but was not provided.",
   );
 }
 
-const port = Number(rawPort);
+const port = Number(rawPort ?? '3000');
 
-if (Number.isNaN(port) || port <= 0) {
+if (!isBuildMode && (Number.isNaN(port) || port <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+const basePath = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
   base: basePath,
