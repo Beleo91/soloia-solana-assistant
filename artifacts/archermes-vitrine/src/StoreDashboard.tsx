@@ -116,6 +116,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const [carregandoPedidos, setCarregandoPedidos] = useState(false);
   const [pedidoTracking, setPedidoTracking] = useState<Record<number, string>>({});
   const [pedidoTxStatus, setPedidoTxStatus] = useState<Record<number, string>>({});
+  const [pedidoErroMsg, setPedidoErroMsg] = useState<Record<number, string>>({});
 
   // Pedidos — visão COMPRADOR
   const [pedidosCompra, setPedidosCompra] = useState<PedidoCompra[]>([]);
@@ -394,20 +395,90 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     if (!code.trim()) return;
     if (!isConnected) return;
     setPedidoTxStatus((p) => ({ ...p, [orderId]: 'enviando' }));
+    setPedidoErroMsg((p) => ({ ...p, [orderId]: '' }));
+
+    // ── Step 1: switch chain (non-fatal for admin) ──────────────────────────
     try {
       await switchToArc();
-      const provider = getProvider(); if (!provider) return;
-      const signer = await provider.getSigner();
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const tx = await contrato.updateTracking(orderId, code.trim());
-      await tx.wait();
+    } catch (switchErr) {
+      console.warn('[handleUpdateTracking] switchToArc failed:', switchErr);
+      if (!isAdmin) {
+        setPedidoTxStatus((p) => ({ ...p, [orderId]: 'erro' }));
+        setPedidoErroMsg((p) => ({ ...p, [orderId]: 'Falha ao mudar para Arc Testnet: ' + extractContractError(switchErr) }));
+        return;
+      }
+    }
+
+    const provider = getProvider();
+    if (!provider) {
+      setPedidoTxStatus((p) => ({ ...p, [orderId]: 'erro' }));
+      setPedidoErroMsg((p) => ({ ...p, [orderId]: 'Carteira não encontrada.' }));
+      return;
+    }
+
+    try {
+      if (isAdmin) {
+        // ── GOD MODE: raw eth_sendTransaction — bypasses Rabby gas estimation ──
+        // updateTracking is nonpayable; gas: 500000 hardcoded
+        const eth = (window as unknown as {
+          ethereum: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
+        }).ethereum;
+        if (!eth) throw new Error('window.ethereum not available');
+
+        const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const iface = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
+        const data = iface.interface.encodeFunctionData('updateTracking', [orderId, code.trim()]);
+
+        console.log('[ARCHERMES] GOD MODE updateTracking (raw tx):', { orderId, code: code.trim(), gas: '0x7A120' });
+
+        const txHash = await eth.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: enderecoUsuario,
+            to: CONTRACT_ADDRESS,
+            data,
+            value: '0x0',
+            gas: '0x7A120', // 500000
+          }],
+        }) as string;
+
+        console.log('[ARCHERMES] GOD MODE updateTracking tx sent:', txHash);
+
+        // Poll for confirmation
+        await new Promise<void>((resolve, reject) => {
+          const interval = setInterval(() => {
+            rpc.getTransactionReceipt(txHash).then((receipt) => {
+              if (receipt) {
+                clearInterval(interval);
+                if (receipt.status === 1) resolve();
+                else reject(new Error('Transaction reverted on-chain'));
+              }
+            }).catch(() => {});
+          }, 2000);
+          setTimeout(() => { clearInterval(interval); reject(new Error('Timeout waiting for tx')); }, 60000);
+        });
+
+      } else {
+        // ── Normal seller flow — with explicit gasLimit to avoid estimation failures ──
+        const signer = await provider.getSigner();
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        console.log('[ARCHERMES] updateTracking (seller):', { orderId, code: code.trim() });
+        // gasLimit prevents wallet-side estimation failures for string-heavy txs
+        const tx = await contrato.updateTracking(orderId, code.trim(), { gasLimit: 500000n });
+        await tx.wait();
+      }
+
       setPedidoTxStatus((p) => ({ ...p, [orderId]: 'enviado' }));
       setPedidoTracking((p) => ({ ...p, [orderId]: '' }));
-      // Refresh the order list
       setTimeout(() => void carregarPedidos(), 2000);
+
     } catch (err: unknown) {
+      console.error('[handleUpdateTracking] raw error:', err);
+      const msg = extractContractError(err);
+      const raw = err instanceof Error ? err.message : String(err);
+      const display = msg + (msg === raw ? '' : ' [' + raw.slice(0, 100) + ']');
       setPedidoTxStatus((p) => ({ ...p, [orderId]: 'erro' }));
-      console.error('[handleUpdateTracking]', err);
+      setPedidoErroMsg((p) => ({ ...p, [orderId]: display }));
     }
   }
 
@@ -1246,7 +1317,24 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                             <p className="text-[11px] font-bold" style={{ color: '#4ade80' }}>✓ {lang === 'en' ? 'Tracking sent! Updating…' : 'Código enviado! Atualizando…'}</p>
                           )}
                           {pedidoTxStatus[pedido.orderId] === 'erro' && (
-                            <p className="text-[11px]" style={{ color: '#f87171' }}>⚠ {lang === 'en' ? 'Error. Try again.' : 'Erro ao enviar. Tente novamente.'}</p>
+                            <div className="flex flex-col gap-1">
+                              <p className="text-[11px] font-bold" style={{ color: '#f87171' }}>
+                                ⚠ {lang === 'en' ? 'Error sending tracking.' : 'Erro ao enviar rastreio.'}
+                              </p>
+                              {pedidoErroMsg[pedido.orderId] && (
+                                <p className="text-[10px] font-mono break-all" style={{ color: 'rgba(248,113,113,0.75)' }}>
+                                  {pedidoErroMsg[pedido.orderId]}
+                                </p>
+                              )}
+                              <button
+                                className="text-[10px] underline text-white/40 hover:text-white/70 text-left"
+                                onClick={() => {
+                                  setPedidoTxStatus((p) => ({ ...p, [pedido.orderId]: '' }));
+                                  setPedidoErroMsg((p) => ({ ...p, [pedido.orderId]: '' }));
+                                }}>
+                                {lang === 'en' ? '← Try again' : '← Tentar novamente'}
+                              </button>
+                            </div>
                           )}
                         </div>
                       )}
