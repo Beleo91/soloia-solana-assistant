@@ -26,10 +26,19 @@ interface MeuProduto {
   priceEth: string;
   category: string;
   isActive: boolean;
-  isSold: boolean;
   stock: bigint;
   imageUrl?: string;
   isBoosted?: boolean;
+}
+
+interface PedidoSeller {
+  orderId: number;
+  itemId: number;
+  itemName: string;
+  buyer: string;
+  amountEth: string;
+  status: number; // 0=Pending 1=Shipped 2=Completed 3=Refunded
+  trackingCode: string;
 }
 
 interface Customizacao {
@@ -81,13 +90,17 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
   const [carregandoProdutos, setCarregandoProdutos] = useState(false);
 
-  const [abaAtiva, setAbaAtiva] = useState<'loja' | 'produtos' | 'visual'>('loja');
+  const [abaAtiva, setAbaAtiva] = useState<'loja' | 'produtos' | 'pedidos' | 'visual'>('loja');
 
   const [customizacao, setCustomizacao] = useState<Customizacao>({ avatarUrl: '', bannerUrl: '', neonColor: '#00e5ff' });
 
-  const [rastreioId, setRastreioId] = useState<number | null>(null);
-  const [rastreioCode, setRastreioCode] = useState('');
   const [txStatus, setTxStatus] = useState<Record<number, string>>({});
+
+  // Pedidos (Order system)
+  const [pedidos, setPedidos] = useState<PedidoSeller[]>([]);
+  const [carregandoPedidos, setCarregandoPedidos] = useState(false);
+  const [pedidoTracking, setPedidoTracking] = useState<Record<number, string>>({});
+  const [pedidoTxStatus, setPedidoTxStatus] = useState<Record<number, string>>({});
 
   const [dragOverBanner, setDragOverBanner] = useState(false);
   const [dragOverAvatar, setDragOverAvatar] = useState(false);
@@ -252,7 +265,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             priceEth: formatUnits(item.price, 18),
             category: item.category,
             isActive: item.isActive,
-            isSold: item.isSold,
             stock: BigInt(item.stock ?? 0),
             imageUrl: imgs[0],
             isBoosted,
@@ -266,6 +278,63 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   useEffect(() => {
     if (abaAtiva === 'produtos' && isConnected) carregarMeusProdutos();
   }, [abaAtiva, isConnected, enderecoUsuario]);
+
+  // Carregar pedidos recebidos (como vendedor)
+  const carregarPedidos = async () => {
+    if (!enderecoUsuario) return;
+    setCarregandoPedidos(true);
+    try {
+      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const orderIds: bigint[] = await contrato.getOrdersBySeller(enderecoUsuario);
+      const lista: PedidoSeller[] = [];
+      await Promise.all(orderIds.map(async (oid) => {
+        try {
+          const o = await contrato.orders(Number(oid));
+          const it = await contrato.items(Number(o.itemId));
+          lista.push({
+            orderId: Number(o.orderId),
+            itemId: Number(o.itemId),
+            itemName: it.itemName as string,
+            buyer: o.buyer as string,
+            amountEth: formatUnits(o.amount as bigint, 18),
+            status: Number(o.status),
+            trackingCode: o.trackingCode as string,
+          });
+        } catch { /* skip bad order */ }
+      }));
+      // Most recent orders first
+      lista.sort((a, b) => b.orderId - a.orderId);
+      setPedidos(lista);
+    } catch (err) { console.error('[carregarPedidos]', err); }
+    finally { setCarregandoPedidos(false); }
+  };
+
+  useEffect(() => {
+    if (abaAtiva === 'pedidos' && isConnected) void carregarPedidos();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abaAtiva, isConnected, enderecoUsuario]);
+
+  async function handleUpdateTracking(orderId: number, code: string) {
+    if (!code.trim()) return;
+    if (!isConnected) return;
+    setPedidoTxStatus((p) => ({ ...p, [orderId]: 'enviando' }));
+    try {
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
+      const signer = await provider.getSigner();
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const tx = await contrato.updateTracking(orderId, code.trim());
+      await tx.wait();
+      setPedidoTxStatus((p) => ({ ...p, [orderId]: 'enviado' }));
+      setPedidoTracking((p) => ({ ...p, [orderId]: '' }));
+      // Refresh the order list
+      setTimeout(() => void carregarPedidos(), 2000);
+    } catch (err: unknown) {
+      setPedidoTxStatus((p) => ({ ...p, [orderId]: 'erro' }));
+      console.error('[handleUpdateTracking]', err);
+    }
+  }
 
   async function handleCriarLoja(isPro: boolean) {
     if (!nomeLoja.trim()) { setErroMsg('Digite o nome da sua loja.'); return; }
@@ -388,21 +457,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     }
   }
 
-  async function handleSetRastreio(id: number, code: string) {
-    if (!code.trim()) return;
-    if (!isConnected) return;
-    setTxStatus((p) => ({ ...p, [id]: 'rastreando' }));
-    try {
-      await switchToArc();
-      const provider = getProvider(); if (!provider) return;
-      const signer = await provider.getSigner();
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const tx = await contrato.setTrackingCode(id, code.trim());
-      await tx.wait();
-      setTxStatus((p) => ({ ...p, [id]: 'rastreado' }));
-      setRastreioId(null); setRastreioCode('');
-    } catch { setTxStatus((p) => ({ ...p, [id]: 'erro' })); }
-  }
 
   async function handleUpgradePro() {
     if (!isConnected) return;
@@ -446,9 +500,10 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const neonAtual = NEON_OPTIONS.find((n) => n.value === customizacao.neonColor) ?? NEON_OPTIONS[0];
 
   const abas = [
-    { id: 'loja', label: t('dash.tab.myStore') },
+    { id: 'loja',    label: t('dash.tab.myStore') },
     { id: 'produtos', label: t('dash.tab.products') },
-    { id: 'visual', label: t('dash.tab.visual') },
+    { id: 'pedidos', label: lang === 'en' ? 'ORDERS' : 'PEDIDOS' },
+    { id: 'visual',  label: t('dash.tab.visual') },
   ] as const;
 
   return (
@@ -822,15 +877,11 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-[10px] font-mono text-white/20">#{prod.id}</span>
-                        {prod.isSold && (
-                          <span className="text-[9px] font-bold tracking-widest bg-green-500/10 border border-green-400/30 text-green-400 px-1.5 py-0.5 rounded-full"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.sold')}</span>
-                        )}
-                        {!prod.isActive && !prod.isSold && (
+                        {!prod.isActive && (
                           <span className="text-[9px] font-bold tracking-widest bg-red-500/10 border border-red-400/30 text-red-400 px-1.5 py-0.5 rounded-full"
                             style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.paused')}</span>
                         )}
-                        {prod.isActive && !prod.isSold && (
+                        {prod.isActive && (
                           <span className="text-[9px] font-bold tracking-widest bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full"
                             style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.active')}</span>
                         )}
@@ -852,18 +903,13 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   </div>
 
                   {/* Ações do produto */}
-                  {!prod.isSold && prod.isActive && (
+                  {prod.isActive && (
                     <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => handleCancelarItem(prod.id)}
                         disabled={txStatus[prod.id] === 'cancelando'}
                         className="btn-neon btn-neon-red btn-neon-sm">
                         {txStatus[prod.id] === 'cancelando' ? `⟳ ${t('dash.canceling')}` : `⏸ ${t('dash.cancelItem')}`}
-                      </button>
-                      <button
-                        onClick={() => setRastreioId(rastreioId === prod.id ? null : prod.id)}
-                        className="btn-neon btn-neon-cyan btn-neon-sm">
-                        📦 {t('dash.addTracking')}
                       </button>
                       <button
                         onClick={() => handleExcluirItem(prod.id)}
@@ -886,30 +932,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                     </div>
                   )}
 
-                  {/* Form de rastreio inline */}
-                  {rastreioId === prod.id && (
-                    <div className="flex gap-2 mt-1">
-                      <input
-                        type="text"
-                        placeholder="Código de rastreio (Ex: BR123456789)"
-                        value={rastreioCode}
-                        onChange={(e) => setRastreioCode(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg text-xs text-white outline-none
-                          border border-white/10 focus:border-cyan-400/40 transition-all"
-                        style={{ background: 'rgba(255,255,255,0.05)', fontFamily: 'inherit' }}
-                      />
-                      <button
-                        onClick={() => handleSetRastreio(prod.id, rastreioCode)}
-                        disabled={txStatus[prod.id] === 'rastreando'}
-                        className="btn-neon btn-neon-filled btn-neon-sm">
-                        {txStatus[prod.id] === 'rastreando' ? '⟳' : '✓ Enviar'}
-                      </button>
-                    </div>
-                  )}
-
-                  {txStatus[prod.id] === 'rastreado' && (
-                    <p className="text-green-400 text-xs">✓ {t('dash.trackingSaved')}</p>
-                  )}
                   {txStatus[prod.id] === 'cancelado' && (
                     <p className="text-red-400 text-xs">{t('dash.listingPaused')}</p>
                   )}
@@ -918,6 +940,146 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ABA: PEDIDOS A ENVIAR */}
+          {abaAtiva === 'pedidos' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black tracking-widest uppercase"
+                    style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
+                    📦 {lang === 'en' ? 'Orders to Ship' : 'Pedidos a Enviar'}
+                  </h3>
+                  <p className="text-[10px] mt-0.5 text-white/30">
+                    {lang === 'en' ? 'Add tracking codes to release payment to your wallet' : 'Informe o código de rastreio para liberar o pagamento'}
+                  </p>
+                </div>
+                <button onClick={() => void carregarPedidos()}
+                  className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
+                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                  ↺ {lang === 'en' ? 'Refresh' : 'Atualizar'}
+                </button>
+              </div>
+
+              {carregandoPedidos && (
+                <div className="flex items-center justify-center py-12 gap-3">
+                  <div className="w-6 h-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+                  <span className="text-cyan-400/60 text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    {lang === 'en' ? 'Loading orders…' : 'Carregando pedidos…'}
+                  </span>
+                </div>
+              )}
+
+              {!carregandoPedidos && pedidos.length === 0 && (
+                <div className="flex flex-col items-center py-16 gap-4">
+                  <span className="text-5xl opacity-15">📦</span>
+                  <p className="text-white/30 text-xs tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                    {lang === 'en' ? 'No orders yet' : 'Nenhum pedido ainda'}
+                  </p>
+                </div>
+              )}
+
+              {!carregandoPedidos && pedidos.map((pedido) => {
+                const statusLabel =
+                  pedido.status === 0 ? { txt: lang === 'en' ? 'PENDING' : 'PENDENTE', cls: 'text-yellow-400 bg-yellow-500/10 border-yellow-400/30' }
+                  : pedido.status === 1 ? { txt: lang === 'en' ? 'SHIPPED' : 'ENVIADO', cls: 'text-cyan-400 bg-cyan-500/10 border-cyan-400/30' }
+                  : pedido.status === 2 ? { txt: lang === 'en' ? 'COMPLETED' : 'CONCLUÍDO', cls: 'text-green-400 bg-green-500/10 border-green-400/30' }
+                  : { txt: lang === 'en' ? 'REFUNDED' : 'REEMBOLSADO', cls: 'text-white/40 bg-white/5 border-white/10' };
+
+                return (
+                  <div key={pedido.orderId} className="rounded-xl border border-white/10 p-4 flex flex-col gap-3"
+                    style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono text-white/20">Order #{pedido.orderId}</span>
+                          <span className={`text-[9px] font-bold tracking-widest px-1.5 py-0.5 rounded-full border ${statusLabel.cls}`}
+                            style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                            {statusLabel.txt}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-sm text-white" style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.04em' }}>
+                          {pedido.itemName}
+                        </h4>
+                        <p className="text-white/30 text-xs mt-0.5">
+                          {lang === 'en' ? 'Buyer:' : 'Comprador:'} {pedido.buyer.slice(0, 8)}…{pedido.buyer.slice(-6)}
+                        </p>
+                        <p className="text-white/40 text-xs">
+                          {lang === 'en' ? 'Escrow:' : 'Em garantia:'}{' '}
+                          <span style={{ color: customizacao.neonColor, fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
+                            {parseFloat(pedido.amountEth).toFixed(6)} ETH
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Shipped: show tracking code */}
+                    {pedido.status === 1 && pedido.trackingCode && (
+                      <div className="rounded-lg px-3 py-2 border border-cyan-400/20"
+                        style={{ background: 'rgba(0,229,255,0.04)' }}>
+                        <p className="text-[10px] text-cyan-400/60 tracking-widest uppercase mb-0.5" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          {lang === 'en' ? 'Tracking code' : 'Código de Rastreio'}
+                        </p>
+                        <p className="text-sm font-mono text-cyan-300">{pedido.trackingCode}</p>
+                        <p className="text-[10px] text-white/30 mt-1">
+                          {lang === 'en' ? 'Waiting for buyer confirmation to release funds.' : 'Aguardando confirmação do comprador para liberar fundos.'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Completed */}
+                    {pedido.status === 2 && (
+                      <div className="rounded-lg px-3 py-2 border border-green-400/20"
+                        style={{ background: 'rgba(74,222,128,0.04)' }}>
+                        <p className="text-green-400 text-xs font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          ✓ {lang === 'en' ? 'Payment released to your wallet!' : 'Pagamento liberado para sua carteira!'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Pending: tracking input */}
+                    {pedido.status === 0 && (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[10px] text-yellow-400/70 tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                          ⏳ {lang === 'en' ? 'Ship the item and add the tracking code below:' : 'Envie o produto e informe o código de rastreio abaixo:'}
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={lang === 'en' ? 'Tracking code (ex: BR123456789)' : 'Código de rastreio (ex: BR123456789)'}
+                            value={pedidoTracking[pedido.orderId] ?? ''}
+                            onChange={(e) => setPedidoTracking((p) => ({ ...p, [pedido.orderId]: e.target.value }))}
+                            className="flex-1 px-3 py-2 rounded-lg text-xs text-white outline-none border border-white/10 focus:border-cyan-400/40 transition-all"
+                            style={{ background: 'rgba(255,255,255,0.05)', fontFamily: 'inherit' }}
+                          />
+                          <button
+                            onClick={() => void handleUpdateTracking(pedido.orderId, pedidoTracking[pedido.orderId] ?? '')}
+                            disabled={pedidoTxStatus[pedido.orderId] === 'enviando' || !(pedidoTracking[pedido.orderId] ?? '').trim()}
+                            className="px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
+                            style={{
+                              fontFamily: "'Orbitron', sans-serif",
+                              background: (pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor + '22' : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${(pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor + '60' : 'rgba(255,255,255,0.1)'}`,
+                              color: (pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor : 'rgba(255,255,255,0.2)',
+                              cursor: (pedidoTracking[pedido.orderId] ?? '').trim() ? 'pointer' : 'not-allowed',
+                            }}>
+                            {pedidoTxStatus[pedido.orderId] === 'enviando' ? '⟳' : lang === 'en' ? '📦 Ship' : '📦 Enviar'}
+                          </button>
+                        </div>
+                        {pedidoTxStatus[pedido.orderId] === 'enviado' && (
+                          <p className="text-green-400 text-xs">✓ {lang === 'en' ? 'Tracking code sent!' : 'Código enviado! Atualizando...'}</p>
+                        )}
+                        {pedidoTxStatus[pedido.orderId] === 'erro' && (
+                          <p className="text-red-400 text-xs">⚠ {lang === 'en' ? 'Error sending. Try again.' : 'Erro ao enviar. Tente novamente.'}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

@@ -101,43 +101,63 @@ Utility scripts package. Each script is a `.ts` file in `src/` with a correspond
 Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript + Tailwind CSS v4.
 
 **Chain**: Arc Testnet (chainId 5042002), RPC: `https://rpc.testnet.arc.network`, Explorer: `https://testnet.arcscan.app`
-**Contract v3**: `0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557` (deployed 2026-03-28, tx `0x537a849c1a6d072ab5956189637870050862f705cf66aeac7f2a10708f5fec02`, block 34300305)
-**Contract v2 (legacy)**: `0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9` (deprecated)
+**Contract v4 (ACTIVE)**: `0x78cd1587e4CA8e052A7672faF43F0Cfb16D16447` (deployed 2026-03-29, tx `0x3074d6…`, block ~34660000)
+**Contract v3 (deprecated)**: `0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557`
+**Contract v2 (deprecated)**: `0x5C39699d4fb56225ec9da2e9FE31b0A5f83b8cB9`
 **Auth**: Privy (`@privy-io/react-auth`)
 **Key files**:
-- `src/HomePage.tsx` — vitrine principal (Lojas Parceiras carousel, Produtos Impulsionados, product grid)
-- `src/StoreDashboard.tsx` — painel do lojista (tabs: loja, produtos, visual)
+- `src/HomePage.tsx` — vitrine principal (Lojas Parceiras carousel, Produtos Impulsionados, Minhas Compras, product grid, leaderboard)
+- `src/StoreDashboard.tsx` — painel do lojista (tabs: loja, produtos, pedidos, visual)
 - `src/Home.css` — layout-critical CSS (cyberpunk card classes, parceira-card, neon glows, glow-pulse)
-- `src/contract.ts` — ABI + CONTRACT_ADDRESS
+- `src/contract.ts` — ABI + CONTRACT_ADDRESS (v4)
 - `src/chains.ts` — arcTestnet chain config
 - `src/stablecoins.ts` — USDC/EURC ERC-20 helpers (approveERC20, transferERC20)
+- `src/contractUtils.ts` — shared `extractContractError` helper
+
+**v4 Contract Escrow/Order System**:
+- `Order` struct: `orderId, itemId, buyer, seller, amount, status (0=Pending/1=Shipped/2=Completed/3=Refunded), trackingCode`
+- `buyItem(_itemId)` — creates Order, holds ETH in escrow
+- `updateTracking(orderId, code)` — seller only → sets tracking code, status → Shipped
+- `releaseFunds(orderId)` — buyer only → releases escrow to seller, status → Completed
+- `refundOrder(orderId)` — seller/admin → refunds buyer, status → Refunded
+- `getOrdersByBuyer(addr)` / `getOrdersByseller(addr)` — view helpers returning orderId arrays
+- Item struct v4: `id, itemName, price, category, seller, isActive, stock` (no `isSold`, `buyer`, `trackingCode` etc.)
+- Events: `OrderCreated(orderId, itemId, buyer indexed, seller, amount)`
+
+**StoreDashboard tabs**:
+1. `loja` — store info & registration
+2. `produtos` — manage listings (cancel, delete, boost); no tracking form (moved to pedidos tab)
+3. `pedidos` — "Pedidos a Enviar": pending orders with tracking input → `updateTracking`; shipped orders show code; completed orders show payment released
+4. `visual` — colors, avatar, banner
+
+**HomePage Minhas Compras (buyer)**:
+- Loads via `getOrdersByBuyer` → `orders(orderId)` + `items(itemId)`
+- Status display: Pending=yellow (waiting shipment), Shipped=cyan (shows tracking + confirm button), Completed=green, Refunded=grey
+- "Confirmar Entrega e Liberar Pagamento" → calls `releaseFunds(orderId)`
+- Leaderboard uses `OrderCreated` events with 9,000 block window (Arc RPC limit is 10k)
 
 **Features**:
-- On-chain product listing via smart contract (createItem / buyItem)
-- ERC-20 stablecoin support (USDC/EURC): approve → transfer flow
+- On-chain product listing via smart contract (listItem / buyItem)
+- ERC-20 stablecoin support (USDC/EURC): approve → transfer flow (off-chain, unaffected by escrow)
 - Persistent deletion per wallet address (localStorage `archermes_deleted_items_<addr>`)
 - Lojas Parceiras: horizontal-scroll carousel, banner + overlapping round logo + 2×2 mini product grid
 - Produtos Impulsionados: 4 premium cards with gold/purple neon borders, glow-pulse animation
-- StoreDashboard visual panel: preset banner gallery (4), preset avatar gallery (4), file upload dropzones with drag-and-drop, neon color picker
-- Ghost products bug fix: `cancelItem` called on-chain before local cleanup; BroadcastChannel sync via `product:cancelled`
-- Stock system v3: `uint256 stock` in Item struct; `listItem` requires `_stock >= 1`; `buyItem` decrements stock; frontend shows ⛔ ESGOTADO badge
+- StoreDashboard visual panel: preset banner gallery, preset avatar gallery, file upload dropzones, neon color picker
+- Stock system: `uint256 stock` in Item struct; `listItem` requires `_stock >= 1`; `buyItem` decrements stock; frontend shows ⛔ ESGOTADO badge
 - ImgBB pipeline: API server `/api/images/upload` proxies to ImgBB; permanent `https://i.ibb.co/...` URLs stored
-- Glassmorphism UI: modal-box + modal-compra-box use `backdrop-filter: blur(24px)` glass effect; product card hover glow (cyan)
-- Buy button micro-interaction: inline `.btn-spinner` CSS spinner inside the button when `buyEstado === 'confirmando'`; no blocking full-screen overlay
-- Top Architects Leaderboard: queries `ItemBought` + `ItemListed` events on-chain; shows top 3 sellers (by salesCount) + top 3 buyers (by buyCount) with 👑🥈🥉 ranking
+- Glassmorphism UI: modal-box + modal-compra-box use `backdrop-filter: blur(24px)` glass effect
+- Market Champions Leaderboard: top 3 sellers + buyers from `OrderCreated` events (9k block window)
 
 **Image Hosting**:
 - `src/imageUploader.ts` — abstraction layer for image uploads
-- When `VITE_IMGBB_API_KEY` is set: images are uploaded to Imgbb CDN (free) and stored as permanent https:// URLs. Get a free key at imgbb.com.
-- Without the key: images fall back to base64 localStorage (per-browser, per-origin — images won't persist across different deployments/domains)
-- Must set `VITE_IMGBB_API_KEY` in both Replit Secrets AND Vercel env vars for cross-domain persistence
+- When `VITE_IMGBB_API_KEY` is set: images uploaded to ImgBB CDN, permanent https:// URLs
+- Without the key: base64 localStorage fallback (per-browser only)
 
 **Notes**:
-- `STABLECOIN_ADDRESSES` are placeholders (0x000...001 / 0x000...002) until real contracts deploy
-- "Invalid hook call" in console is pre-existing Privy/Coinbase connector issue, not a bug
+- "Invalid hook call" in console is pre-existing Privy/Coinbase connector HMR issue, not a bug
 - Tailwind v4: layout-critical styles use custom CSS classes in `Home.css`
-- v3 contract has store subscription checks **disabled** (commented out in `listItem`) for open testing — re-enable before mainnet
-- Admin wallet `0x434189487484F20B9Bf0e0c28C1559B0c961274B` bypasses product-count checks in frontend; `platFee = 0` in `buyItem` on-chain when owner buys
-- `platformFeePercent = 3`, `referralFeePercent = 2` (synced in frontend constants)
-- Deployer wallet: `0xC87e5c146ed67625eAf90dD6B6780b22cb2f5a41` — used only for gas, no privileged role
-- v3 deploy scripts: `contracts/compile.cjs` (compile) → `contracts/deploy.js` (deploy, reads `DEPLOYER_PRIVATE_KEY`)
+- v4 contract has store subscription checks **disabled** (commented out in `listItem`) for open testing
+- Admin wallet `0x434189487484F20B9Bf0e0c28C1559B0c961274B` bypasses product-count checks in frontend
+- `platformFeePercent = 3`, `referralFeePercent = 2`
+- Deployer wallet: `0xC87e5c146ed67625eAf90dD6B6780b22cb2f5a41`
+- Deploy scripts: `contracts/compile.cjs` → `contracts/deploy.js` (reads `DEPLOYER_PRIVATE_KEY`)

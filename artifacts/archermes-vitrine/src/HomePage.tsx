@@ -42,16 +42,14 @@ interface ItemBlockchain {
   stock?: bigint;
 }
 
-interface ItemComprado {
-  id: number;
+interface OrderCompra {
+  orderId: number;
+  itemId: number;
   itemName: string;
-  priceEth: string;
-  category: string;
+  amountEth: string;
   seller: string;
-  buyer: string;
-  isSold: boolean;
-  isDelivered: boolean;
-  isRefunded: boolean;
+  status: number; // 0=Pending 1=Shipped 2=Completed 3=Refunded
+  trackingCode: string;
 }
 
 const MOCK_ITEM_CURRENCY: Record<number, StablecoinSymbol> = {
@@ -457,9 +455,9 @@ export default function HomePage() {
   const [leaderboardBuyers,  setLeaderboardBuyers]  = useState<LeaderboardBuyer[]>([]);
   const [showLeaderboard,    setShowLeaderboard]    = useState(false);
 
-  // Minhas Compras (histórico do comprador)
+  // Minhas Compras (histórico do comprador — Order system)
   const [showMinhasCompras, setShowMinhasCompras] = useState(false);
-  const [minhasCompras, setMinhasCompras] = useState<ItemComprado[]>([]);
+  const [minhasCompras, setMinhasCompras] = useState<OrderCompra[]>([]);
   const [carregandoCompras, setCarregandoCompras] = useState(false);
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [confirmErro, setConfirmErro] = useState<Record<number, string>>({});
@@ -508,10 +506,9 @@ export default function HomePage() {
       const itens: ItemBlockchain[] = rawItems
         .filter((item): item is NonNullable<typeof item> => {
           if (!item) return false;
-          const it = item as { isSold?: boolean; isActive?: boolean; stock?: bigint };
-          // Keep only active, non-sold items.
-          // stock is optional for backward compat with v1/v2 contract (no stock field).
-          if (!!it.isSold || !it.isActive) return false;
+          const it = item as { isActive?: boolean; stock?: bigint };
+          // v4: item is active when isActive=true and stock>0 (contract sets isActive=false on sell-out)
+          if (!it.isActive) return false;
           if (it.stock !== undefined && it.stock <= 0n) return false;
           return true;
         })
@@ -642,26 +639,23 @@ export default function HomePage() {
         const rpcProvider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
         const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpcProvider);
 
-        const [eventsListed, eventsBought] = await Promise.all([
-          contrato.queryFilter(contrato.filters.ItemListed()) as Promise<import('ethers').EventLog[]>,
-          contrato.queryFilter(contrato.filters.ItemBought()) as Promise<import('ethers').EventLog[]>,
-        ]);
+        // Arc testnet limits eth_getLogs to 10,000 blocks per query.
+        // Use the last 9,000 blocks as window (safe margin under the 10k cap).
+        const latestBlock = await rpcProvider.getBlockNumber();
+        const fromBlock = Math.max(0, latestBlock - 9000);
 
-        const sellerMap = new Map<bigint, string>();
-        for (const ev of eventsListed) {
-          const id: bigint = ev.args[0];
-          const seller: string = ev.args[3];
-          sellerMap.set(id, seller.toLowerCase());
-        }
+        const eventsOrders = await (
+          contrato.queryFilter(contrato.filters.OrderCreated(), fromBlock, latestBlock) as Promise<import('ethers').EventLog[]>
+        );
 
         const buyerCount  = new Map<string, number>();
         const sellerCount = new Map<string, number>();
-        for (const ev of eventsBought) {
-          const id: bigint = ev.args[0];
-          const buyer: string = ev.args[1].toLowerCase();
+        for (const ev of eventsOrders) {
+          // OrderCreated(orderId, itemId, buyer indexed, seller, amount)
+          const buyer: string = (ev.args[2] as string).toLowerCase();
+          const seller: string = (ev.args[3] as string).toLowerCase();
           buyerCount.set(buyer, (buyerCount.get(buyer) ?? 0) + 1);
-          const seller = sellerMap.get(id);
-          if (seller) sellerCount.set(seller, (sellerCount.get(seller) ?? 0) + 1);
+          sellerCount.set(seller, (sellerCount.get(seller) ?? 0) + 1);
         }
 
         const topBuyers: LeaderboardBuyer[] = Array.from(buyerCount.entries())
@@ -687,65 +681,52 @@ export default function HomePage() {
     void carregarLeaderboard();
   }, []);
 
-  // ── MINHAS COMPRAS ──
+  // ── MINHAS COMPRAS (Order system v4) ──
   const carregarMinhasCompras = useCallback(async () => {
     if (!walletAddress) return;
     setCarregandoCompras(true);
     try {
       const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
-      const iface = new Interface(CONTRACT_ABI);
-      const buyerTopic = '0x' + walletAddress.slice(2).toLowerCase().padStart(64, '0');
-      const eventFragment = iface.getEvent('ItemBought');
-      if (!eventFragment) throw new Error('Event not found');
-      const logs = await provider.getLogs({
-        address: CONTRACT_ADDRESS,
-        topics: [eventFragment.topicHash, null, buyerTopic],
-        fromBlock: 0,
-        toBlock: 'latest',
-      });
-      const ids = logs.map((l) => {
-        const parsed = iface.parseLog({ topics: [...l.topics], data: l.data });
-        return Number(parsed!.args[0] as bigint);
-      });
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const orderIds: bigint[] = await contrato.getOrdersByBuyer(walletAddress);
       const compras = await Promise.all(
-        ids.map(async (id) => {
-          const it = await contrato.items(id);
+        orderIds.map(async (oid) => {
+          const o = await contrato.orders(Number(oid));
+          const it = await contrato.items(Number(o.itemId));
           return {
-            id,
+            orderId: Number(o.orderId),
+            itemId:  Number(o.itemId),
             itemName: it.itemName as string,
-            priceEth: formatUnits(it.price as bigint, 18),
-            category: it.category as string,
-            seller: it.seller as string,
-            buyer: it.buyer as string,
-            isSold: it.isSold as boolean,
-            isDelivered: it.isDelivered as boolean,
-            isRefunded: it.isRefunded as boolean,
-          } satisfies ItemComprado;
+            amountEth: formatUnits(o.amount as bigint, 18),
+            seller: o.seller as string,
+            status: Number(o.status),
+            trackingCode: o.trackingCode as string,
+          } satisfies OrderCompra;
         })
       );
-      setMinhasCompras(compras.filter((c) => c.isSold));
+      // Most recent orders first
+      compras.sort((a, b) => b.orderId - a.orderId);
+      setMinhasCompras(compras);
     } catch { /* ignore */ }
     setCarregandoCompras(false);
   }, [walletAddress]);
 
-  async function handleConfirmarRecebimento(id: number) {
+  async function handleConfirmarRecebimento(orderId: number) {
     if (!isConnected) return;
-    setConfirmandoId(id);
-    setConfirmErro((p) => ({ ...p, [id]: '' }));
+    setConfirmandoId(orderId);
+    setConfirmErro((p) => ({ ...p, [orderId]: '' }));
     try {
       await switchToArc();
       const provider = getProvider();
       if (!provider) throw new Error('No provider');
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const tx = await contrato.confirmDelivery(id);
+      const tx = await contrato.releaseFunds(orderId);
       await tx.wait();
       await carregarMinhasCompras();
-      broadcastVitrineEvent({ type: 'product:sold', id });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setConfirmErro((p) => ({ ...p, [id]: msg.slice(0, 100) }));
+      const msg = extractContractError(err);
+      setConfirmErro((p) => ({ ...p, [orderId]: msg }));
     }
     setConfirmandoId(null);
   }
@@ -1511,57 +1492,80 @@ export default function HomePage() {
                   </p>
                 ) : (
                   <div className="flex flex-col gap-3 mt-4">
-                    {minhasCompras.map((compra) => (
-                      <div key={compra.id} className="rounded-xl border border-white/10 p-4 flex flex-col gap-3"
-                        style={{ background: 'rgba(255,255,255,0.02)' }}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-mono text-white/20">#{compra.id}</span>
-                              {compra.isRefunded && (
-                                <span className="text-[9px] bg-yellow-500/10 border border-yellow-400/30 text-yellow-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                                  {t('purchases.refunded')}
+                    {minhasCompras.map((compra) => {
+                      const statusInfo =
+                        compra.status === 0 ? { label: t('purchases.pending'),   cls: 'bg-yellow-500/10 border-yellow-400/30 text-yellow-400' }
+                        : compra.status === 1 ? { label: t('purchases.shipped'),   cls: 'bg-cyan-500/10 border-cyan-400/30 text-cyan-400' }
+                        : compra.status === 2 ? { label: t('purchases.delivered'), cls: 'bg-green-500/10 border-green-400/30 text-green-400' }
+                        : { label: t('purchases.refunded'), cls: 'bg-white/5 border-white/10 text-white/40' };
+
+                      return (
+                        <div key={compra.orderId} className="rounded-xl border border-white/10 p-4 flex flex-col gap-3"
+                          style={{ background: 'rgba(255,255,255,0.02)' }}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] font-mono text-white/20">Order #{compra.orderId}</span>
+                                <span className={`text-[9px] border px-1.5 py-0.5 rounded-full font-bold tracking-widest ${statusInfo.cls}`}
+                                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                  {statusInfo.label}
                                 </span>
-                              )}
-                              {compra.isDelivered && !compra.isRefunded && (
-                                <span className="text-[9px] bg-green-500/10 border border-green-400/30 text-green-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                                  {t('purchases.delivered')}
-                                </span>
-                              )}
-                              {!compra.isDelivered && !compra.isRefunded && (
-                                <span className="text-[9px] bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                                  {t('purchases.pending')}
-                                </span>
+                              </div>
+                              <p className="text-sm font-bold text-white truncate" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                {compra.itemName}
+                              </p>
+                              <p className="text-white/30 text-[10px] font-mono mt-0.5">
+                                {t('vitrine.seller')} {abreviarEndereco(compra.seller)}
+                              </p>
+                            </div>
+                            <span className="text-cyan-400 font-black text-sm flex-shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                              {parseFloat(compra.amountEth).toFixed(6)} ETH
+                            </span>
+                          </div>
+
+                          {/* Shipped: mostrar código de rastreio */}
+                          {compra.status === 1 && compra.trackingCode && (
+                            <div className="rounded-lg px-3 py-2 border border-cyan-400/20"
+                              style={{ background: 'rgba(0,229,255,0.04)' }}>
+                              <p className="text-[9px] text-cyan-400/60 tracking-widest uppercase mb-0.5" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                                {t('purchases.trackingCode')}
+                              </p>
+                              <p className="text-sm font-mono text-cyan-300">{compra.trackingCode}</p>
+                            </div>
+                          )}
+
+                          {/* Pending: aguardando envio */}
+                          {compra.status === 0 && (
+                            <p className="text-yellow-400/70 text-[10px] tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                              ⏳ {t('purchases.waitingShipment')}
+                            </p>
+                          )}
+
+                          {/* Shipped: botão de confirmar entrega */}
+                          {compra.status === 1 && (
+                            <div className="flex flex-col gap-2">
+                              <button
+                                onClick={() => void handleConfirmarRecebimento(compra.orderId)}
+                                disabled={confirmandoId === compra.orderId}
+                                className="btn-neon btn-neon-full"
+                                style={{ borderColor: '#4ade80', color: confirmandoId === compra.orderId ? '#ffffff50' : '#4ade80', background: 'rgba(74,222,128,0.05)', fontSize: '0.7rem' }}>
+                                {confirmandoId === compra.orderId ? t('purchases.confirming') : t('purchases.confirmBtn')}
+                              </button>
+                              {confirmErro[compra.orderId] && (
+                                <p className="text-red-400 text-[10px]">{confirmErro[compra.orderId]}</p>
                               )}
                             </div>
-                            <p className="text-sm font-bold text-white truncate" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                              {compra.itemName}
-                            </p>
-                            <p className="text-white/30 text-[10px] font-mono mt-0.5">
-                              {t('vitrine.seller')} {abreviarEndereco(compra.seller)}
-                            </p>
-                          </div>
-                          <span className="text-cyan-400 font-black text-sm flex-shrink-0" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                            {parseFloat(compra.priceEth).toFixed(4)} ETH
-                          </span>
-                        </div>
+                          )}
 
-                        {!compra.isDelivered && !compra.isRefunded && (
-                          <div className="flex flex-col gap-2">
-                            <button
-                              onClick={() => void handleConfirmarRecebimento(compra.id)}
-                              disabled={confirmandoId === compra.id}
-                              className="btn-neon btn-neon-full"
-                              style={{ borderColor: '#4ade80', color: confirmandoId === compra.id ? '#ffffff50' : '#4ade80', background: 'rgba(74,222,128,0.05)', fontSize: '0.7rem' }}>
-                              {confirmandoId === compra.id ? t('purchases.confirming') : t('purchases.confirmBtn')}
-                            </button>
-                            {confirmErro[compra.id] && (
-                              <p className="text-red-400 text-[10px]">{confirmErro[compra.id]}</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          {/* Completed */}
+                          {compra.status === 2 && (
+                            <p className="text-green-400 text-[10px] font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                              ✓ {t('purchases.paymentReleased')}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {/* Suporte / Disputa */}
                     <div className="rounded-xl border border-white/5 p-4 flex flex-col gap-1 mt-2"

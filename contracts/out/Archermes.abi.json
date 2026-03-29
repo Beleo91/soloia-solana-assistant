@@ -16,17 +16,23 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "id",
+        "name": "orderId",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "address",
-        "name": "liberadoPor",
+        "name": "seller",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
       }
     ],
-    "name": "DeliveryConfirmed",
+    "name": "FundsReleased",
     "type": "event"
   },
   {
@@ -40,25 +46,6 @@
       }
     ],
     "name": "ItemBanned",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "buyer",
-        "type": "address"
-      }
-    ],
-    "name": "ItemBought",
     "type": "event"
   },
   {
@@ -111,11 +98,60 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "id",
+        "name": "orderId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "itemId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "buyer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "RefundIssued",
+    "name": "OrderCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "orderId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "buyer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "OrderRefunded",
     "type": "event"
   },
   {
@@ -124,7 +160,7 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "owner",
+        "name": "storeOwner",
         "type": "address"
       },
       {
@@ -149,7 +185,7 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "owner",
+        "name": "storeOwner",
         "type": "address"
       }
     ],
@@ -162,7 +198,7 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "id",
+        "name": "orderId",
         "type": "uint256"
       },
       {
@@ -172,8 +208,60 @@
         "type": "string"
       }
     ],
-    "name": "TrackingAdded",
+    "name": "TrackingUpdated",
     "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "STATUS_COMPLETED",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "STATUS_PENDING",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "STATUS_REFUNDED",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "STATUS_SHIPPED",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
     "inputs": [
@@ -235,19 +323,6 @@
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      }
-    ],
-    "name": "confirmDelivery",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "string",
         "name": "_name",
         "type": "string"
@@ -261,6 +336,44 @@
     "name": "createStore",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_buyer",
+        "type": "address"
+      }
+    ],
+    "name": "getOrdersByBuyer",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_seller",
+        "type": "address"
+      }
+    ],
+    "name": "getOrdersBySeller",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -294,39 +407,9 @@
         "type": "string"
       },
       {
-        "internalType": "string",
-        "name": "trackingCode",
-        "type": "string"
-      },
-      {
         "internalType": "address payable",
         "name": "seller",
         "type": "address"
-      },
-      {
-        "internalType": "address payable",
-        "name": "buyer",
-        "type": "address"
-      },
-      {
-        "internalType": "address payable",
-        "name": "referrer",
-        "type": "address"
-      },
-      {
-        "internalType": "bool",
-        "name": "isSold",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isDelivered",
-        "type": "bool"
-      },
-      {
-        "internalType": "bool",
-        "name": "isRefunded",
-        "type": "bool"
       },
       {
         "internalType": "bool",
@@ -368,6 +451,55 @@
     "name": "listItem",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "orders",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "orderId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "itemId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address payable",
+        "name": "buyer",
+        "type": "address"
+      },
+      {
+        "internalType": "address payable",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "status",
+        "type": "uint8"
+      },
+      {
+        "internalType": "string",
+        "name": "trackingCode",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -439,11 +571,24 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "_id",
+        "name": "_orderId",
         "type": "uint256"
       }
     ],
-    "name": "refundBuyer",
+    "name": "refundOrder",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_orderId",
+        "type": "uint256"
+      }
+    ],
+    "name": "releaseFunds",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -487,24 +632,6 @@
       }
     ],
     "name": "setStoreFees",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "_trackingCode",
-        "type": "string"
-      }
-    ],
-    "name": "setTrackingCode",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -561,6 +688,37 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "totalOrders",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_orderId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_trackingCode",
+        "type": "string"
+      }
+    ],
+    "name": "updateTracking",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
