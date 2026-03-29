@@ -2,17 +2,15 @@
 pragma solidity ^0.8.20;
 
 /**
- * ARCHERMES Marketplace — v6
- * Changes vs v5:
- *  GOD_MODE_ADMIN is hardcoded as an immutable constant so that the platform
- *  owner always has unrestricted access even if `owner` ever changes.
- *  Admin bypasses:
- *   - createStore : no fee, auto PRO tier, can always overwrite own store
- *   - renewStore  : no fee
- *   - upgradeToPro: no fee
- *   - listItem    : no store/subscription check
- *   - buyItem     : zero platform fee, can buy own items (for testing)
- *  All admin functions accept value: 0 — no ETH ever required from admin.
+ * ARCHERMES Marketplace — v7
+ * Changes vs v6:
+ *  - Order struct gains string deliveryAddress (collected at checkout)
+ *  - buyItem gains string _deliveryAddress param (required, non-empty)
+ *  - shippingFee public state variable (default 0.001 ETH, admin can update)
+ *  - msg.value must equal item.price + shippingFee
+ *  - shippingFee is included in the escrowed amount (released to seller)
+ *  - Stock decrement: item.stock-- already existed; if stock == 0, item.isActive = false
+ *  - setShippingFee admin function added
  */
 contract Archermes {
     // ── Immutable admin (hardcoded — cannot be changed) ──────────────────────
@@ -25,6 +23,7 @@ contract Archermes {
     uint256 public referralFeePercent = 2;
     uint256 public basicStoreFee = 0.001 ether;
     uint256 public proStoreFee  = 0.003 ether;
+    uint256 public shippingFee  = 0.001 ether;
 
     uint256 public totalItems;
     uint256 public totalOrders;
@@ -65,6 +64,7 @@ contract Archermes {
         uint256         amount;
         uint8           status;
         string          trackingCode;
+        string          deliveryAddress;
     }
 
     mapping(uint256 => Item)    public items;
@@ -115,23 +115,25 @@ contract Archermes {
         proStoreFee   = _pro;
     }
 
+    function setShippingFee(uint256 _fee) external onlyOwner {
+        shippingFee = _fee;
+    }
+
     // ── Store lifecycle ───────────────────────────────────────────────────────
     function createStore(string calldata _name, bool _isPro) external payable notPaused {
         if (_isAdmin(msg.sender)) {
-            // GOD MODE: refund any accidental ETH sent, create/overwrite store as PRO
             if (msg.value > 0) payable(msg.sender).transfer(msg.value);
             stores[msg.sender] = Store({
                 storeName:    _name,
-                expiresAt:    block.timestamp + STORE_DURATION * 10, // 10 years
-                tier:         1, // always PRO
-                productCount: stores[msg.sender].productCount,        // preserve count
+                expiresAt:    block.timestamp + STORE_DURATION * 10,
+                tier:         1,
+                productCount: stores[msg.sender].productCount,
                 totalStars:   stores[msg.sender].totalStars,
                 reviewCount:  stores[msg.sender].reviewCount
             });
             emit StoreCreated(msg.sender, _name, 1);
             return;
         }
-        // Normal user flow
         uint256 fee = _isPro ? proStoreFee : basicStoreFee;
         require(msg.value >= fee, "Insufficient store fee");
         if (fee > 0) owner.transfer(fee);
@@ -184,14 +186,13 @@ contract Archermes {
         emit StoreUpgraded(msg.sender);
     }
 
-    // ── Listing ───────────────────────────────────────────────────────────────
+    // ── Item listing ──────────────────────────────────────────────────────────
     function listItem(
         string calldata _itemName,
-        uint256 _price,
+        uint256         _price,
         string calldata _category,
-        uint256 _stock
+        uint256         _stock
     ) external notPaused {
-        require(_stock > 0,  "Stock must be at least 1");
         require(_price > 0,  "Price must be greater than zero");
         require(bytes(_itemName).length > 0, "Item name required");
 
@@ -229,43 +230,56 @@ contract Archermes {
     }
 
     // ── Purchase (creates Order, holds funds in Escrow) ───────────────────────
-    function buyItem(uint256 _id, address payable _referrer) external payable notPaused {
-        Item storage item = items[_id];
-        require(item.isActive,           "Item not active");
-        require(item.stock > 0,          "Produto esgotado");
-        require(msg.value >= item.price, "Insufficient payment");
+    function buyItem(
+        uint256         _id,
+        address payable _referrer,
+        string calldata _deliveryAddress
+    ) external payable notPaused {
+        require(bytes(_deliveryAddress).length > 0, "Delivery address required");
 
-        // Admin can buy any item (including own) for testing
+        Item storage item = items[_id];
+        require(item.isActive,  "Item not active");
+        require(item.stock > 0, "Produto esgotado");
+
+        uint256 totalRequired = item.price + shippingFee;
+        require(msg.value >= totalRequired, "Insufficient payment (include shipping)");
+
         if (!_isAdmin(msg.sender)) {
             require(msg.sender != item.seller, "Cannot buy own item");
         }
 
-        // Admin pays zero platform fee
+        // Fees are calculated on item.price only (not shipping)
         uint256 platFee = _isAdmin(msg.sender) ? 0 : (item.price * platformFeePercent) / 100;
         bool validRef = (
             _referrer != address(0) &&
             _referrer != item.seller &&
             _referrer != msg.sender
         );
-        uint256 refFee   = validRef ? (item.price * referralFeePercent) / 100 : 0;
-        uint256 escrowed = item.price - platFee - refFee;
+        uint256 refFee = validRef ? (item.price * referralFeePercent) / 100 : 0;
+
+        // Escrowed = item.price + shippingFee - platFee - refFee
+        // (shipping fee is held in escrow and released to seller with funds)
+        uint256 escrowed = totalRequired - platFee - refFee;
 
         if (platFee > 0) owner.transfer(platFee);
         if (refFee > 0 && validRef) _referrer.transfer(refFee);
-        if (msg.value > item.price) payable(msg.sender).transfer(msg.value - item.price);
+        // Refund any overpayment
+        if (msg.value > totalRequired) payable(msg.sender).transfer(msg.value - totalRequired);
 
+        // Stock control — auto-deactivate when exhausted
         item.stock--;
         if (item.stock == 0) item.isActive = false;
 
         totalOrders++;
         orders[totalOrders] = Order({
-            orderId:      totalOrders,
-            itemId:       _id,
-            buyer:        payable(msg.sender),
-            seller:       item.seller,
-            amount:       escrowed,
-            status:       STATUS_PENDING,
-            trackingCode: ""
+            orderId:         totalOrders,
+            itemId:          _id,
+            buyer:           payable(msg.sender),
+            seller:          item.seller,
+            amount:          escrowed,
+            status:          STATUS_PENDING,
+            trackingCode:    "",
+            deliveryAddress: _deliveryAddress
         });
         _buyerOrders[msg.sender].push(totalOrders);
         _sellerOrders[item.seller].push(totalOrders);

@@ -101,7 +101,8 @@ Utility scripts package. Each script is a `.ts` file in `src/` with a correspond
 Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript + Tailwind CSS v4.
 
 **Chain**: Arc Testnet (chainId 5042002), RPC: `https://rpc.testnet.arc.network`, Explorer: `https://testnet.arcscan.app`
-**Contract v6 (ACTIVE)**: `0xA809EB74d8202d1d6a8849bE6ac4D19B85f91437` (deployed 2026-03-29, tx `0x3f71af…`, block 34427331)
+**Contract v7 (ACTIVE)**: `0x7A556059337e038486267E6fb2aF2c09F70410Cd` (deployed 2026-03-29, tx `0xe81853…`, block 34439709)
+**Contract v6 (deprecated)**: `0xA809EB74d8202d1d6a8849bE6ac4D19B85f91437`
 **Contract v5 (deprecated)**: `0xd16FA8418D52aAf71BCc00036f1FDaA5A684Cce7`
 **Contract v4 (deprecated)**: `0x78cd1587e4CA8e052A7672faF43F0Cfb16D16447`
 **Contract v3 (deprecated)**: `0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557`
@@ -110,22 +111,22 @@ Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript 
 - `src/HomePage.tsx` — vitrine principal (section order: Boosted → VIP → Leaderboard → Partners circles → Minhas Compras → Vitrine)
 - `src/StoreDashboard.tsx` — painel do lojista (tabs: loja, produtos, pedidos, visual); rating modal before releaseFunds
 - `src/Home.css` — layout-critical CSS (cyberpunk card classes, neon glows, glow-pulse, scroll-oculto)
-- `src/contract.ts` — ABI + CONTRACT_ADDRESS (v5, 42 entries)
+- `src/contract.ts` — ABI + CONTRACT_ADDRESS (v7, 45 entries)
 - `src/chains.ts` — arcTestnet chain config
 - `src/stablecoins.ts` — USDC/EURC ERC-20 helpers (approveERC20, transferERC20)
 - `src/contractUtils.ts` — shared `extractContractError` helper
-- `contracts/Archermes.sol` — v6 source with GOD_MODE_ADMIN + 7-star rating system
+- `contracts/Archermes.sol` — v7 source with GOD_MODE_ADMIN + 7-star rating + deliveryAddress + shippingFee
 
-**v6 Contract (escrow + 7-star rating + GOD_MODE_ADMIN)**:
-- `Order` struct: `orderId, itemId, buyer, seller, amount, status (0=Pending/1=Shipped/2=Completed/3=Refunded), trackingCode`
+**v7 Contract (escrow + 7-star rating + GOD_MODE_ADMIN + shipping)**:
+- `Order` struct: `orderId, itemId, buyer, seller, amount, status (0=Pending/1=Shipped/2=Completed/3=Refunded), trackingCode, deliveryAddress`
 - `Store` struct: `storeName, expiresAt, tier, productCount, totalStars, reviewCount`
-- `buyItem(_itemId)` — creates Order, holds ETH in escrow
+- `shippingFee` public state var (default 0.001 ETH) — `setShippingFee(fee)` admin function
+- `buyItem(_id, _referrer, _deliveryAddress)` payable — `msg.value = item.price + shippingFee`; creates Order, holds ETH in escrow; decrements stock (auto-deactivates at 0)
 - `updateTracking(orderId, code)` — seller only → sets tracking code, status → Shipped
 - `releaseFunds(orderId, rating uint8)` — buyer only → releases escrow, records 1–7 star rating → status Completed
 - `refundOrder(orderId)` — seller/admin → refunds buyer, status → Refunded
 - `getOrdersByBuyer(addr)` / `getOrdersBySeller(addr)` — view helpers returning orderId arrays
 - `getStoreRating(addr)` — returns (totalStars, reviewCount, avgX100) where avgX100 is avg*100
-- Events: `OrderCreated(orderId, itemId, buyer indexed, seller, amount)`, `StoreRated(store indexed, buyer indexed, stars, newAvgX100)`
 
 **StoreDashboard tabs**:
 1. `loja` — store info & registration

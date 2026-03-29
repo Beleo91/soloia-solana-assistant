@@ -1,6 +1,7 @@
-// v6 — deployed 2026-03-29 — tx 0x3f71afafe0af5c3350e1ad1450e1cc5ea0e8a98ed7f812deb903d5ac724c5525
+// v7 — deployed 2026-03-29 — tx 0xe81853dddf8f97353544362c2746cde9e836a4a7ca7e672b40e91bb3d5a8cef6
 // GOD_MODE_ADMIN hardcoded in contract: 0x434189487484F20B9Bf0e0c28C1559B0c961274B
-export const CONTRACT_ADDRESS = '0xA809EB74d8202d1d6a8849bE6ac4D19B85f91437';
+// v7 changes: deliveryAddress in Order, shippingFee (0.001 ETH), buyItem gains _deliveryAddress param
+export const CONTRACT_ADDRESS = '0x7A556059337e038486267E6fb2aF2c09F70410Cd';
 
 export const CONTRACT_ABI = [
   // ── Admin ────────────────────────────────────────────────────────────────
@@ -8,6 +9,7 @@ export const CONTRACT_ABI = [
   { inputs: [], name: 'togglePause', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_p', type: 'uint256' }, { internalType: 'uint256', name: '_r', type: 'uint256' }], name: 'setFeePercentages', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_basic', type: 'uint256' }, { internalType: 'uint256', name: '_pro', type: 'uint256' }], name: 'setStoreFees', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+  { inputs: [{ internalType: 'uint256', name: '_fee', type: 'uint256' }], name: 'setShippingFee', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 
   // ── Store lifecycle ───────────────────────────────────────────────────────
   { inputs: [{ internalType: 'string', name: '_name', type: 'string' }, { internalType: 'bool', name: '_isPro', type: 'bool' }], name: 'createStore', outputs: [], stateMutability: 'payable', type: 'function' },
@@ -27,12 +29,18 @@ export const CONTRACT_ABI = [
   { inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }], name: 'cancelItem', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }], name: 'banItem', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 
-  // ── Purchase ─────────────────────────────────────────────────────────────
-  { inputs: [{ internalType: 'uint256', name: '_id', type: 'uint256' }, { internalType: 'address payable', name: '_referrer', type: 'address' }], name: 'buyItem', outputs: [], stateMutability: 'payable', type: 'function' },
+  // ── Purchase (v7: deliveryAddress param added) ────────────────────────────
+  {
+    inputs: [
+      { internalType: 'uint256',         name: '_id',              type: 'uint256' },
+      { internalType: 'address payable', name: '_referrer',        type: 'address' },
+      { internalType: 'string',          name: '_deliveryAddress', type: 'string'  },
+    ],
+    name: 'buyItem', outputs: [], stateMutability: 'payable', type: 'function',
+  },
 
   // ── Order management ─────────────────────────────────────────────────────
   { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }, { internalType: 'string', name: '_trackingCode', type: 'string' }], name: 'updateTracking', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-  // v5: releaseFunds now requires a 1-7 star rating
   { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }, { internalType: 'uint8', name: '_rating', type: 'uint8' }], name: 'releaseFunds', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }], name: 'refundOrder', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 
@@ -46,7 +54,6 @@ export const CONTRACT_ABI = [
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'string', name: 'trackingCode', type: 'string' }], name: 'TrackingUpdated', type: 'event' },
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'address', name: 'seller', type: 'address' }, { indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'FundsReleased', type: 'event' },
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'address', name: 'buyer', type: 'address' }, { indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'OrderRefunded', type: 'event' },
-  // v5: StoreRated — emitted when buyer releases funds with a rating
   { anonymous: false, inputs: [{ indexed: true, internalType: 'address', name: 'seller', type: 'address' }, { indexed: false, internalType: 'uint8', name: 'rating', type: 'uint8' }, { indexed: false, internalType: 'uint256', name: 'newTotalStars', type: 'uint256' }, { indexed: false, internalType: 'uint256', name: 'newReviewCount', type: 'uint256' }], name: 'StoreRated', type: 'event' },
 
   // ── Views ─────────────────────────────────────────────────────────────────
@@ -58,6 +65,7 @@ export const CONTRACT_ABI = [
   { inputs: [], name: 'referralFeePercent', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   { inputs: [], name: 'basicStoreFee', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   { inputs: [], name: 'proStoreFee', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+  { inputs: [], name: 'shippingFee', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   {
     inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     name: 'items',
@@ -76,13 +84,14 @@ export const CONTRACT_ABI = [
     inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     name: 'orders',
     outputs: [
-      { internalType: 'uint256',         name: 'orderId',      type: 'uint256' },
-      { internalType: 'uint256',         name: 'itemId',       type: 'uint256' },
-      { internalType: 'address payable', name: 'buyer',        type: 'address' },
-      { internalType: 'address payable', name: 'seller',       type: 'address' },
-      { internalType: 'uint256',         name: 'amount',       type: 'uint256' },
-      { internalType: 'uint8',           name: 'status',       type: 'uint8' },
-      { internalType: 'string',          name: 'trackingCode', type: 'string' },
+      { internalType: 'uint256',         name: 'orderId',         type: 'uint256' },
+      { internalType: 'uint256',         name: 'itemId',          type: 'uint256' },
+      { internalType: 'address payable', name: 'buyer',           type: 'address' },
+      { internalType: 'address payable', name: 'seller',          type: 'address' },
+      { internalType: 'uint256',         name: 'amount',          type: 'uint256' },
+      { internalType: 'uint8',           name: 'status',          type: 'uint8' },
+      { internalType: 'string',          name: 'trackingCode',    type: 'string' },
+      { internalType: 'string',          name: 'deliveryAddress', type: 'string' },
     ],
     stateMutability: 'view', type: 'function',
   },
@@ -94,14 +103,13 @@ export const CONTRACT_ABI = [
       { internalType: 'uint256', name: 'expiresAt',    type: 'uint256' },
       { internalType: 'uint8',   name: 'tier',         type: 'uint8' },
       { internalType: 'uint256', name: 'productCount', type: 'uint256' },
-      { internalType: 'uint256', name: 'totalStars',   type: 'uint256' },   // v5
-      { internalType: 'uint256', name: 'reviewCount',  type: 'uint256' },   // v5
+      { internalType: 'uint256', name: 'totalStars',   type: 'uint256' },
+      { internalType: 'uint256', name: 'reviewCount',  type: 'uint256' },
     ],
     stateMutability: 'view', type: 'function',
   },
   { inputs: [{ internalType: 'address', name: '_buyer', type: 'address' }], name: 'getOrdersByBuyer', outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ internalType: 'address', name: '_seller', type: 'address' }], name: 'getOrdersBySeller', outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }], stateMutability: 'view', type: 'function' },
-  // v5: getStoreRating(seller) → (totalStars, reviewCount, avgX100)
   {
     inputs: [{ internalType: 'address', name: '_seller', type: 'address' }],
     name: 'getStoreRating',

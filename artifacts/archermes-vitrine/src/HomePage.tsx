@@ -444,6 +444,7 @@ export default function HomePage() {
   const [buyEstado, setBuyEstado] = useState<BuyEstado>('idle');
   const [buyErro, setBuyErro] = useState('');
   const [buyTx, setBuyTx] = useState('');
+  const [enderecoEntrega, setEnderecoEntrega] = useState('');
 
   // Escrow / Compra Segura
   const [escrowAtivo, setEscrowAtivo] = useState(true);
@@ -865,17 +866,26 @@ export default function HomePage() {
   }
 
   // ── COMPRA ──
+  // Shipping fee in ETH — matches contract's shippingFee (0.001 ETH default)
+  const SHIPPING_FEE_ETH = '0.001';
+
   function abrirCompra(item: ItemBlockchain) {
     if (!isConnected) { void connect(); return; }
     setItemParaComprar(item);
     setBuyEstado('idle');
     setBuyErro('');
     setBuyTx('');
+    setEnderecoEntrega('');
   }
 
   async function confirmarCompra() {
     if (!itemParaComprar) return;
     if (!isConnected) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
+    if (!enderecoEntrega.trim()) {
+      setBuyErro(lang === 'en' ? 'Please enter your delivery address.' : 'Informe o endereço de entrega.');
+      setBuyEstado('erro');
+      return;
+    }
     setBuyEstado('confirmando');
     const currency = itemParaComprar.currency ?? 'ETH';
     try {
@@ -888,33 +898,31 @@ export default function HomePage() {
 
       if (currency === 'ETH') {
         const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        const priceWei = parseUnits(itemParaComprar.priceEth, 18);
-        const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: priceWei });
+        const priceWei    = parseUnits(itemParaComprar.priceEth, 18);
+        const shippingWei = parseUnits(SHIPPING_FEE_ETH, 18);
+        const totalWei    = priceWei + shippingWei;
+        // v7: buyItem(id, referrer, deliveryAddress) — shipping included in value
+        const tx = await contrato.buyItem(itemParaComprar.id, referrer, enderecoEntrega.trim(), { value: totalWei });
         await tx.wait();
         setBuyTx(tx.hash);
       } else {
         // ── ERC-20 flow (USDC / EURC) ──────────────────────────────────────────
-        // Fee distribution mirrors the on-chain logic for ETH purchases:
-        //   PLATFORM_FEE_PERCENT % → TREASURY_WALLET
-        //   REFERRAL_FEE_PERCENT % → referrer (if present)
-        //   remainder             → seller
+        // For stablecoin purchases the on-chain contract only handles ETH.
+        // We distribute fees client-side and record the delivery address off-chain.
         const tokenAddress = STABLECOIN_ADDRESSES[currency];
         const totalAmount = toTokenAmount(itemParaComprar.priceEth, currency);
         const platformFeeAmount = totalAmount * PLATFORM_FEE_PERCENT / 100n;
         const referralFeeAmount = referrer !== ZERO_ADDRESS ? totalAmount * REFERRAL_FEE_PERCENT / 100n : 0n;
         const sellerAmount = totalAmount - platformFeeAmount - referralFeeAmount;
 
-        // Step 1: platform fee → treasury
         const feeTx = await transferERC20(signer, tokenAddress, TREASURY_WALLET, platformFeeAmount);
         await feeTx.wait();
 
-        // Step 2: referral fee → referrer (if present)
         if (referrer !== ZERO_ADDRESS && referralFeeAmount > 0n) {
           const refTx = await transferERC20(signer, tokenAddress, referrer, referralFeeAmount);
           await refTx.wait();
         }
 
-        // Step 3: seller receives the remainder
         const transferTx = await transferERC20(signer, tokenAddress, itemParaComprar.seller, sellerAmount);
         await transferTx.wait();
         setBuyTx(transferTx.hash);
@@ -972,17 +980,52 @@ export default function HomePage() {
                 </div>
               )}
               {(buyEstado === 'idle' || buyEstado === 'confirmando') && itemParaComprar && (
-                <div style={{ padding: '0.5rem' }}>
-                  <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.08em', marginBottom: '1rem', color: '#00e5ff' }}>
+                <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <h2 style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.85rem', letterSpacing: '0.08em', color: '#00e5ff' }}>
                     {lang === 'en' ? 'Confirm Purchase' : 'Confirmar Compra'}
                   </h2>
-                  <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.25rem' }}>{itemParaComprar.itemName}</p>
+                  <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.15rem' }}>{itemParaComprar.itemName}</p>
                   <p className="text-white/30 text-xs font-mono">{t('vitrine.seller')} {abreviarEndereco(itemParaComprar.seller)}</p>
-                  <div style={{ margin: '1.25rem 0', padding: '0.75rem', background: 'rgba(0,229,255,0.06)', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)' }}>
-                    <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '1.2rem', fontWeight: 900, color: '#00e5ff' }}>
-                      {parseFloat(itemParaComprar.priceEth).toFixed(4)} ETH
-                    </span>
+
+                  {/* Endereço de entrega */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-white/50 tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      📦 {lang === 'en' ? 'Delivery Address' : 'Endereço de Entrega'} <span style={{ color: '#f87171' }}>*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={enderecoEntrega}
+                      onChange={(e) => setEnderecoEntrega(e.target.value)}
+                      placeholder={lang === 'en' ? 'Street, number, city, state, ZIP…' : 'Rua, número, bairro, cidade, estado, CEP…'}
+                      disabled={buyEstado === 'confirmando'}
+                      style={{
+                        width: '100%', borderRadius: '0.5rem', resize: 'none', outline: 'none',
+                        background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,229,255,0.2)',
+                        color: '#fff', fontSize: '0.78rem', padding: '0.5rem 0.75rem', fontFamily: 'inherit',
+                      }}
+                    />
                   </div>
+
+                  {/* Resumo de preços */}
+                  <div style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,229,255,0.06)', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.45)' }}>{lang === 'en' ? 'Product' : 'Produto'}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
+                        {parseFloat(itemParaComprar.priceEth).toFixed(4)} ETH
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.45)' }}>{lang === 'en' ? 'Shipping' : 'Entrega'}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>{SHIPPING_FEE_ETH} ETH</span>
+                    </div>
+                    <div style={{ borderTop: '1px solid rgba(0,229,255,0.15)', paddingTop: '0.35rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'rgba(0,229,255,0.6)', fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.08em' }}>TOTAL</span>
+                      <span style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '1.1rem', fontWeight: 900, color: '#00e5ff' }}>
+                        {(parseFloat(itemParaComprar.priceEth) + parseFloat(SHIPPING_FEE_ETH)).toFixed(4)} ETH
+                      </span>
+                    </div>
+                  </div>
+
                   <button
                     className="btn-neon btn-neon-full btn-neon-cyan"
                     disabled={buyEstado === 'confirmando'}
@@ -2077,35 +2120,78 @@ export default function HomePage() {
                     )}
                   </div>
 
+                  {/* ── Endereço de entrega (obrigatório) ── */}
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-white/50 tracking-widest uppercase"
+                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                      {lang === 'en' ? '📦 Delivery Address' : '📦 Endereço de Entrega'}
+                      <span className="text-red-400 ml-1">*</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={enderecoEntrega}
+                      onChange={(e) => setEnderecoEntrega(e.target.value)}
+                      placeholder={lang === 'en'
+                        ? 'Street, number, city, state, ZIP…'
+                        : 'Rua, número, bairro, cidade, estado, CEP…'}
+                      disabled={buyEstado === 'confirmando'}
+                      className="w-full rounded-xl border border-white/15 bg-white/5 text-white text-sm p-3 resize-none outline-none focus:border-cyan-400/50 placeholder:text-white/25 transition-colors"
+                      style={{ fontFamily: 'inherit' }}
+                    />
+                  </div>
+
+                  {/* ── Resumo de preços ── */}
                   {(() => {
                     const cur = itemParaComprar.currency ?? 'ETH';
                     const meta = cur !== 'ETH' ? STABLECOIN_META[cur as StablecoinSymbol] : null;
+                    const priceNum = parseFloat(itemParaComprar.priceEth);
+                    const shippingNum = parseFloat(SHIPPING_FEE_ETH);
+                    const totalNum = priceNum + shippingNum;
                     const priceDisplay = meta
                       ? formatStablecoinPrice(itemParaComprar.priceEth, cur as StablecoinSymbol)
-                      : parseFloat(itemParaComprar.priceEth).toFixed(4);
+                      : priceNum.toFixed(4);
+                    const totalDisplay = meta
+                      ? formatStablecoinPrice(totalNum.toFixed(6), cur as StablecoinSymbol)
+                      : totalNum.toFixed(4);
                     const cor = meta?.cor ?? '#00e5ff';
                     const fundo = meta?.corFundo ?? 'rgba(0,229,255,0.04)';
                     const borda = meta ? meta.cor + '33' : 'rgba(0,229,255,0.2)';
                     return (
-                      <div className="rounded-xl border p-4 flex items-center justify-between"
+                      <div className="rounded-xl border p-4 flex flex-col gap-2"
                         style={{ background: fundo, borderColor: borda }}>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs text-white/50 tracking-widest uppercase"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('modal.buy.total')}</span>
-                          {meta && (
-                            <span className="currency-badge" style={{
-                              color: meta.cor, background: meta.corFundo, borderColor: meta.cor + '55',
-                            }}>
-                              {cur}
-                            </span>
-                          )}
+                        {/* Preço do produto */}
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-white/50">{lang === 'en' ? 'Product' : 'Produto'}</span>
+                          <span className="text-white/80 font-mono">
+                            {priceDisplay}{cur === 'ETH' && <span className="text-white/40 ml-1 text-xs">ETH</span>}
+                          </span>
                         </div>
-                        <span className="text-2xl font-black"
-                          style={{ fontFamily: "'Orbitron', sans-serif", color: cor,
-                            textShadow: `0 0 12px ${cor}66` }}>
-                          {priceDisplay}
-                          {cur === 'ETH' && <span className="text-sm text-white/40 ml-1 font-normal">ETH</span>}
-                        </span>
+                        {/* Taxa de entrega */}
+                        {cur === 'ETH' && (
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-white/50">{lang === 'en' ? 'Shipping fee' : 'Taxa de entrega'}</span>
+                            <span className="text-white/80 font-mono">
+                              {SHIPPING_FEE_ETH}<span className="text-white/40 ml-1 text-xs">ETH</span>
+                            </span>
+                          </div>
+                        )}
+                        <div className="border-t border-white/10 pt-2 flex items-center justify-between">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs text-white/50 tracking-widest uppercase"
+                              style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('modal.buy.total')}</span>
+                            {meta && (
+                              <span className="currency-badge" style={{
+                                color: meta.cor, background: meta.corFundo, borderColor: meta.cor + '55',
+                              }}>{cur}</span>
+                            )}
+                          </div>
+                          <span className="text-2xl font-black"
+                            style={{ fontFamily: "'Orbitron', sans-serif", color: cor,
+                              textShadow: `0 0 12px ${cor}66` }}>
+                            {totalDisplay}
+                            {cur === 'ETH' && <span className="text-sm text-white/40 ml-1 font-normal">ETH</span>}
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}

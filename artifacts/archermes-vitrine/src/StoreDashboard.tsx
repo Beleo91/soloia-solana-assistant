@@ -39,6 +39,7 @@ interface PedidoSeller {
   amountEth: string;
   status: number; // 0=Pending 1=Shipped 2=Completed 3=Refunded
   trackingCode: string;
+  deliveryAddress: string;
 }
 
 interface PedidoCompra {
@@ -49,6 +50,7 @@ interface PedidoCompra {
   amountEth: string;
   status: number;
   trackingCode: string;
+  deliveryAddress: string;
 }
 
 interface Customizacao {
@@ -319,6 +321,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             amountEth: formatUnits(o.amount as bigint, 18),
             status: Number(o.status),
             trackingCode: o.trackingCode as string,
+            deliveryAddress: (o.deliveryAddress as string) || '',
           });
         } catch { /* skip bad order */ }
       }));
@@ -358,6 +361,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             amountEth: formatUnits(o.amount as bigint, 18),
             status: Number(o.status),
             trackingCode: o.trackingCode as string,
+            deliveryAddress: (o.deliveryAddress as string) || '',
           });
         } catch { /* skip */ }
       }));
@@ -1186,9 +1190,22 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                         </div>
                       </div>
 
-                      {/* Pending → input de rastreio */}
+                      {/* Pending → endereço de entrega + input de rastreio */}
                       {pedido.status === 0 && (
                         <div className="flex flex-col gap-2.5">
+                          {/* ── Delivery address ── */}
+                          {pedido.deliveryAddress ? (
+                            <div className="rounded-lg px-3 py-2.5 flex flex-col gap-1"
+                              style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                              <p className="text-[9px] tracking-widest uppercase font-bold flex items-center gap-1"
+                                style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,191,36,0.8)' }}>
+                                📦 {lang === 'en' ? 'Delivery Address' : 'Endereço de Entrega'}
+                              </p>
+                              <p className="text-xs text-white/70 leading-relaxed" style={{ wordBreak: 'break-word' }}>
+                                {pedido.deliveryAddress}
+                              </p>
+                            </div>
+                          ) : null}
                           <p className="text-[10px] tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,191,36,0.7)' }}>
                             ⏳ {lang === 'en' ? 'Ship the order and add the tracking code:' : 'Envie o produto e informe o código de rastreio:'}
                           </p>
