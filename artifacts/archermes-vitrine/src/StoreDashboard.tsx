@@ -411,33 +411,89 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     if (!nomeLoja.trim()) { setErroMsg('Digite o nome da sua loja.'); return; }
     if (!isConnected) return;
     setEstado('criando'); setErroMsg('');
+
+    // ── Step 1: switch chain (non-fatal for admin) ──────────────────────────
     try {
       await switchToArc();
-      const provider = getProvider(); if (!provider) return;
-      const signer = await provider.getSigner();
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-      // GOD MODE: admin always pays 0 ETH — bypass fee calculation entirely.
-      // Manual gasLimit prevents gas estimation phase (which would fail for non-owner
-      // wallets if the estimator contacts the wrong contract state).
-      let taxa = 0n;
+    } catch (switchErr) {
+      console.warn('[ARCHERMES] switchToArc failed — continuing anyway:', switchErr);
       if (!isAdmin) {
+        setErroMsg('Falha ao mudar para Arc Testnet. ' + extractContractError(switchErr));
+        setEstado('erro');
+        return;
+      }
+    }
+
+    // ── Step 2: get provider & signer ───────────────────────────────────────
+    const provider = getProvider();
+    if (!provider) {
+      setErroMsg('Carteira não encontrada. Instale Rabby ou MetaMask.');
+      setEstado('erro');
+      return;
+    }
+
+    try {
+      if (isAdmin) {
+        // ── GOD MODE: raw eth_sendTransaction bypasses ALL gas estimation ──
+        // This avoids ethers.js estimateGas + Rabby's internal estimation.
+        // The contract's GOD_MODE_ADMIN constant grants free store creation.
+        const eth = (window as unknown as { ethereum: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+        if (!eth) throw new Error('window.ethereum not available');
+
+        // Encode the calldata using a read-only Contract instance
+        const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const iface = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
+        const data = iface.interface.encodeFunctionData('createStore', [nomeLoja.trim(), isPro]);
+
+        console.log('[ARCHERMES] GOD MODE createStore (raw tx):', {
+          from: enderecoUsuario, to: CONTRACT_ADDRESS, isPro, gas: '0x493E0',
+        });
+
+        const txHash = await eth.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: enderecoUsuario,
+            to: CONTRACT_ADDRESS,
+            data,
+            value: '0x0',
+            gas: '0x493E0', // 300000 — hardcoded, bypasses estimation
+          }],
+        }) as string;
+
+        console.log('[ARCHERMES] GOD MODE tx sent:', txHash);
+        // Wait for confirmation via polling
+        await new Promise<void>((resolve, reject) => {
+          const interval = setInterval(() => {
+            rpc.getTransactionReceipt(txHash).then((receipt) => {
+              if (receipt) {
+                clearInterval(interval);
+                if (receipt.status === 1) resolve();
+                else reject(new Error('Transaction reverted on-chain'));
+              }
+            }).catch(() => {});
+          }, 2000);
+          setTimeout(() => { clearInterval(interval); reject(new Error('Timeout waiting for tx')); }, 60000);
+        });
+      } else {
+        // ── Normal user flow ────────────────────────────────────────────────
+        const signer = await provider.getSigner();
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
         const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
         const c2 = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
-        taxa = isPro ? await c2.proStoreFee() : await c2.basicStoreFee();
+        const taxa = isPro ? await c2.proStoreFee() : await c2.basicStoreFee();
+        console.log('[ARCHERMES] createStore (user):', { isPro, taxa: taxa.toString() });
+        const tx = await contrato.createStore(nomeLoja.trim(), isPro, { value: taxa });
+        await tx.wait();
       }
 
-      const txOpts: Record<string, unknown> = { value: taxa };
-      if (isAdmin) txOpts.gasLimit = 300000n; // skip gas estimation for admin
-
-      console.log('[ARCHERMES] createStore:', { nome: nomeLoja.trim(), isPro, taxa: taxa.toString(), isAdmin });
-      const tx = await contrato.createStore(nomeLoja.trim(), isPro, txOpts);
-      await tx.wait();
       setEstado('sucesso');
-      // Reload store data after creation so UI reflects the new store immediately
       setTimeout(() => { void checarLoja(); }, 1500);
     } catch (err: unknown) {
-      setErroMsg(extractContractError(err));
+      console.error('[ARCHERMES] handleCriarLoja error:', err);
+      const msg = extractContractError(err);
+      // Show the raw error too so we can debug
+      const raw = err instanceof Error ? err.message : String(err);
+      setErroMsg(msg + (msg === raw ? '' : '\n[debug: ' + raw.slice(0, 120) + ']'));
       setEstado('erro');
     }
   }

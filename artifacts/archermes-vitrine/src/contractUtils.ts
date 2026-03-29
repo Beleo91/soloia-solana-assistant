@@ -21,7 +21,11 @@ export function extractContractError(err: unknown): string {
   if (!err) return 'Erro desconhecido.';
 
   // User deliberately rejected → short friendly message
-  if (isUserRejection(err)) return 'Transação cancelada pelo usuário.';
+  if (isUserRejection(err)) {
+    // Log the raw error so we can diagnose cases where this fires incorrectly
+    console.error('[contractUtils] isUserRejection triggered on:', err);
+    return 'Transação cancelada pelo usuário.';
+  }
 
   const e = err as Record<string, unknown>;
 
