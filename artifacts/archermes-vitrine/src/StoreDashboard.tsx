@@ -119,6 +119,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const [pedidosCompra, setPedidosCompra] = useState<PedidoCompra[]>([]);
   const [carregandoPedidosCompra, setCarregandoPedidosCompra] = useState(false);
   const [releaseStatus, setReleaseStatus] = useState<Record<number, 'liberando' | 'liberado' | 'erro'>>({});
+  const [ratingModal, setRatingModal] = useState<{ orderId: number; hover: number; selected: number } | null>(null);
 
   const [dragOverBanner, setDragOverBanner] = useState(false);
   const [dragOverAvatar, setDragOverAvatar] = useState(false);
@@ -366,15 +367,16 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     finally { setCarregandoPedidosCompra(false); }
   };
 
-  async function handleReleaseFunds(orderId: number) {
+  async function handleReleaseFunds(orderId: number, rating: number) {
     if (!isConnected) return;
+    setRatingModal(null);
     setReleaseStatus((p) => ({ ...p, [orderId]: 'liberando' }));
     try {
       await switchToArc();
       const provider = getProvider(); if (!provider) return;
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const tx = await contrato.releaseFunds(orderId);
+      const tx = await contrato.releaseFunds(orderId, rating);
       await tx.wait();
       setReleaseStatus((p) => ({ ...p, [orderId]: 'liberado' }));
       setTimeout(() => void carregarPedidosCompra(), 2000);
@@ -1275,9 +1277,9 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                             </p>
                           </div>
 
-                          {/* Release funds button — pulsing neon */}
+                          {/* Release funds button — opens rating modal */}
                           <button
-                            onClick={() => void handleReleaseFunds(pedido.orderId)}
+                            onClick={() => setRatingModal({ orderId: pedido.orderId, hover: 0, selected: 0 })}
                             disabled={releaseStatus[pedido.orderId] === 'liberando' || releaseStatus[pedido.orderId] === 'liberado'}
                             className="w-full py-3.5 rounded-xl font-black tracking-widest uppercase text-sm transition-all duration-200 relative overflow-hidden"
                             style={{
@@ -1295,7 +1297,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                                 {lang === 'en' ? 'Releasing funds… Approve in wallet' : 'Liberando fundos… Aprove na carteira'}
                               </span>
                             ) : (
-                              `✅ ${lang === 'en' ? 'I RECEIVED IT — Release Payment' : 'RECEBI A ENCOMENDA — Liberar Pagamento'}`
+                              `✅ ${lang === 'en' ? 'I RECEIVED IT — Rate & Release' : 'RECEBI A ENCOMENDA — Avaliar & Liberar'}`
                             )}
                           </button>
                           {releaseStatus[pedido.orderId] === 'erro' && (
@@ -1654,6 +1656,97 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── RATING MODAL (7 estrelas) ── */}
+      {ratingModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setRatingModal(null)}>
+          <div
+            className="relative rounded-2xl p-7 flex flex-col gap-5 items-center"
+            style={{
+              background: 'linear-gradient(145deg, rgba(10,13,26,0.98), rgba(16,20,40,0.98))',
+              border: '1.5px solid rgba(74,222,128,0.3)',
+              boxShadow: '0 0 60px rgba(74,222,128,0.15), 0 0 120px rgba(0,229,255,0.08)',
+              maxWidth: '380px', width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}>
+
+            {/* Close */}
+            <button
+              onClick={() => setRatingModal(null)}
+              className="absolute top-3 right-4 text-white/30 hover:text-white/60 text-lg transition-colors">
+              ✕
+            </button>
+
+            {/* Title */}
+            <div className="text-center">
+              <p className="text-xs font-black tracking-widest uppercase mb-1"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', textShadow: '0 0 12px rgba(74,222,128,0.4)' }}>
+                {lang === 'en' ? '⭐ RATE THIS SELLER' : '⭐ AVALIAR VENDEDOR'}
+              </p>
+              <p className="text-white/40 text-[11px]">
+                {lang === 'en'
+                  ? 'Select a rating before releasing payment'
+                  : 'Escolha uma nota antes de liberar o pagamento'}
+              </p>
+            </div>
+
+            {/* 7 stars */}
+            <div className="flex gap-2">
+              {[1,2,3,4,5,6,7].map((star) => {
+                const active = star <= (ratingModal.hover || ratingModal.selected);
+                return (
+                  <button
+                    key={star}
+                    onMouseEnter={() => setRatingModal((m) => m ? { ...m, hover: star } : m)}
+                    onMouseLeave={() => setRatingModal((m) => m ? { ...m, hover: 0 } : m)}
+                    onClick={() => setRatingModal((m) => m ? { ...m, selected: star } : m)}
+                    style={{
+                      fontSize: '1.8rem',
+                      filter: active ? 'drop-shadow(0 0 6px rgba(251,191,36,0.7))' : 'none',
+                      opacity: active ? 1 : 0.25,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      transform: active ? 'scale(1.15)' : 'scale(1)',
+                      background: 'none', border: 'none', padding: '0.1rem',
+                    }}>
+                    ★
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Rating label */}
+            <p className="text-[11px] font-bold tracking-widest text-center"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: ratingModal.selected > 0 ? '#fbbf24' : 'rgba(255,255,255,0.2)', minHeight: '1.2rem' }}>
+              {ratingModal.selected > 0
+                ? `${ratingModal.selected}/7 ${lang === 'en' ? 'stars' : 'estrelas'}`
+                : lang === 'en' ? 'Tap a star to rate' : 'Toque em uma estrela'}
+            </p>
+
+            {/* Confirm button */}
+            <button
+              onClick={() => {
+                if (ratingModal.selected < 1) return;
+                void handleReleaseFunds(ratingModal.orderId, ratingModal.selected);
+              }}
+              disabled={ratingModal.selected < 1}
+              className="w-full py-3 rounded-xl font-black tracking-widest uppercase text-sm transition-all"
+              style={{
+                fontFamily: "'Orbitron', sans-serif",
+                background: ratingModal.selected > 0 ? 'rgba(74,222,128,0.18)' : 'rgba(74,222,128,0.05)',
+                border: ratingModal.selected > 0 ? '1.5px solid rgba(74,222,128,0.6)' : '1.5px solid rgba(74,222,128,0.15)',
+                color: ratingModal.selected > 0 ? '#4ade80' : 'rgba(74,222,128,0.3)',
+                boxShadow: ratingModal.selected > 0 ? '0 0 20px rgba(74,222,128,0.2)' : 'none',
+                cursor: ratingModal.selected > 0 ? 'pointer' : 'not-allowed',
+              }}>
+              {lang === 'en' ? '✅ CONFIRM & RELEASE PAYMENT' : '✅ CONFIRMAR & LIBERAR PAGAMENTO'}
+            </button>
           </div>
         </div>
       )}

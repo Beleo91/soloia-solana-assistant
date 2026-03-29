@@ -1,5 +1,5 @@
-// v4 — deployed 2026-03-29 — tx 0x3074d6727798bcf3deb621eae6ec33b2b3e2c737f8290003c045efd3bf5645ea
-export const CONTRACT_ADDRESS = '0x78cd1587e4CA8e052A7672faF43F0Cfb16D16447';
+// v5 — deployed 2026-03-29 — tx 0xb8c43794367a783b37b92fe5968c32917ab2b7b0fbb2300c69b6f7edcffb8cc0
+export const CONTRACT_ADDRESS = '0xd16FA8418D52aAf71BCc00036f1FDaA5A684Cce7';
 
 export const CONTRACT_ABI = [
   // ── Admin ────────────────────────────────────────────────────────────────
@@ -30,7 +30,8 @@ export const CONTRACT_ABI = [
 
   // ── Order management ─────────────────────────────────────────────────────
   { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }, { internalType: 'string', name: '_trackingCode', type: 'string' }], name: 'updateTracking', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-  { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }], name: 'releaseFunds', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+  // v5: releaseFunds now requires a 1-7 star rating
+  { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }, { internalType: 'uint8', name: '_rating', type: 'uint8' }], name: 'releaseFunds', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_orderId', type: 'uint256' }], name: 'refundOrder', outputs: [], stateMutability: 'nonpayable', type: 'function' },
 
   // ── Events ───────────────────────────────────────────────────────────────
@@ -43,6 +44,8 @@ export const CONTRACT_ABI = [
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'string', name: 'trackingCode', type: 'string' }], name: 'TrackingUpdated', type: 'event' },
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'address', name: 'seller', type: 'address' }, { indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'FundsReleased', type: 'event' },
   { anonymous: false, inputs: [{ indexed: true, internalType: 'uint256', name: 'orderId', type: 'uint256' }, { indexed: false, internalType: 'address', name: 'buyer', type: 'address' }, { indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' }], name: 'OrderRefunded', type: 'event' },
+  // v5: StoreRated — emitted when buyer releases funds with a rating
+  { anonymous: false, inputs: [{ indexed: true, internalType: 'address', name: 'seller', type: 'address' }, { indexed: false, internalType: 'uint8', name: 'rating', type: 'uint8' }, { indexed: false, internalType: 'uint256', name: 'newTotalStars', type: 'uint256' }, { indexed: false, internalType: 'uint256', name: 'newReviewCount', type: 'uint256' }], name: 'StoreRated', type: 'event' },
 
   // ── Views ─────────────────────────────────────────────────────────────────
   { inputs: [], name: 'owner', outputs: [{ internalType: 'address payable', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
@@ -89,9 +92,22 @@ export const CONTRACT_ABI = [
       { internalType: 'uint256', name: 'expiresAt',    type: 'uint256' },
       { internalType: 'uint8',   name: 'tier',         type: 'uint8' },
       { internalType: 'uint256', name: 'productCount', type: 'uint256' },
+      { internalType: 'uint256', name: 'totalStars',   type: 'uint256' },   // v5
+      { internalType: 'uint256', name: 'reviewCount',  type: 'uint256' },   // v5
     ],
     stateMutability: 'view', type: 'function',
   },
   { inputs: [{ internalType: 'address', name: '_buyer', type: 'address' }], name: 'getOrdersByBuyer', outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ internalType: 'address', name: '_seller', type: 'address' }], name: 'getOrdersBySeller', outputs: [{ internalType: 'uint256[]', name: '', type: 'uint256[]' }], stateMutability: 'view', type: 'function' },
+  // v5: getStoreRating(seller) → (totalStars, reviewCount, avgX100)
+  {
+    inputs: [{ internalType: 'address', name: '_seller', type: 'address' }],
+    name: 'getStoreRating',
+    outputs: [
+      { internalType: 'uint256', name: 'totalStars',  type: 'uint256' },
+      { internalType: 'uint256', name: 'reviewCount', type: 'uint256' },
+      { internalType: 'uint256', name: 'avgX100',     type: 'uint256' },
+    ],
+    stateMutability: 'view', type: 'function',
+  },
 ];

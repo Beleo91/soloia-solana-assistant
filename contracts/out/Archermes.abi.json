@@ -185,6 +185,37 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "seller",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "rating",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newTotalStars",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newReviewCount",
+        "type": "uint256"
+      }
+    ],
+    "name": "StoreRated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "storeOwner",
         "type": "address"
       }
@@ -371,6 +402,35 @@
         "internalType": "uint256[]",
         "name": "",
         "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_seller",
+        "type": "address"
+      }
+    ],
+    "name": "getStoreRating",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "totalStars",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "reviewCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "avgX100",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -586,6 +646,11 @@
         "internalType": "uint256",
         "name": "_orderId",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "_rating",
+        "type": "uint8"
       }
     ],
     "name": "releaseFunds",
@@ -664,6 +729,16 @@
       {
         "internalType": "uint256",
         "name": "productCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalStars",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "reviewCount",
         "type": "uint256"
       }
     ],

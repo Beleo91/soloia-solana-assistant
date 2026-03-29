@@ -1,0 +1,34 @@
+Preciso de uma grande reformulação visual na Home Page e um upgrade no Smart Contract para um sistema de avaliação de 7 estrelas atrelado ao Escrow. Siga estes passos detalhadamente:
+
+1. Reordenação da Home Page (Top para Bottom):
+Altere a ordem de renderização dos componentes na página inicial para esta exata hierarquia:
+
+1º - Produtos Impulsionados (No topo absoluto).
+
+2º - Lojas em Destaque (VIP PRO).
+
+3º - Botão 'Campeões do Mercado' (Ranking).
+
+4º - Lojas Parceiras.
+
+5º - Vitrine On-Chain (Por último, na base da página).
+
+2. Redesign Visual dos Componentes:
+
+Lojas em Destaque: Transforme esses cards em algo Premium e Maior. Eles devem ocupar mais espaço horizontal, mostrando um Banner de fundo (cover image da loja) e a foto de perfil (avatar) sobreposta. Adicione um brilho neon forte e o selo 'VIP PRO' em evidência.
+
+Lojas Parceiras: Torne este componente minimalista e pequeno. Remova o fundo grande. Mostre apenas o círculo (avatar) da foto da loja e o nome abaixo. Deixe-os compactos e alinhados horizontalmente acima da Vitrine.
+
+3. Atualização do Smart Contract (Sistema de 7 Estrelas):
+
+Modifique o Smart Contract. Crie variáveis estruturais para as Lojas (Merchants) para armazenar 'Total de Estrelas' e 'Número de Avaliações'.
+
+Atualize a função de liberação de fundos do Escrow (ex: releaseFunds). Agora ela deve exigir um parâmetro uint8 rating (variando de 1 a 7). Quando o comprador chamar essa função, o contrato repassa o dinheiro ao lojista, soma as estrelas ao perfil da loja e incrementa o contador de avaliações.
+
+4. Frontend - Modal de Avaliação e Ranking:
+
+Na aba 'Minhas Compras', quando o cliente clicar no botão '✅ RECEBI A ENCOMENDA', não chame a transação imediatamente. Primeiro, abra um Modal pedindo para ele avaliar a loja de 1 a 7 estrelas. Só após selecionar a nota, ele confirma e assina a transação de releaseFunds passando a nota escolhida.
+
+Atualize a seção 'Campeões do Mercado'. O ranking agora deve exibir, ao lado do nome da loja, a Média de Estrelas (calculada com base no contrato) e o número de vendas concluídas em tempo real.
+
+Mantenha o design Cyberpunk (Dark mode, bordas neon) em todas as novas implementações.

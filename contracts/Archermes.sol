@@ -2,16 +2,13 @@
 pragma solidity ^0.8.20;
 
 /**
- * ARCHERMES Marketplace — v4
- * Changes vs v3:
- *  1. Order struct replaces item-level escrow: each purchase creates an Order
- *     with its own escrow, status, and tracking code.
- *  2. buyItem() holds funds in contract escrow (not forwarded to seller).
- *  3. updateTracking(orderId, code) — seller only — marks order Shipped.
- *  4. releaseFunds(orderId)  — buyer only  — releases escrow to seller (Completed).
- *  5. refundOrder(orderId)   — seller/admin — returns escrow to buyer (Refunded).
- *  6. getOrdersByBuyer / getOrdersBySeller view helpers.
- *  7. Multi-stock items still supported: each unit sold creates a separate Order.
+ * ARCHERMES Marketplace — v5
+ * Changes vs v4:
+ *  1. Store struct gains `totalStars` and `reviewCount` for 7-star rating system.
+ *  2. releaseFunds(orderId, uint8 rating) now requires a rating 1-7.
+ *     On release, stars are accumulated to the seller's store profile.
+ *  3. New event `StoreRated` emitted on each completed review.
+ *  4. New view `getStoreRating` returns (totalStars, reviewCount, avgX100).
  */
 contract Archermes {
     address payable public owner;
@@ -49,6 +46,8 @@ contract Archermes {
         uint256  expiresAt;
         uint8    tier;
         uint256  productCount;
+        uint256  totalStars;    // sum of all ratings received (each 1-7)
+        uint256  reviewCount;   // number of reviews received
     }
 
     struct Order {
@@ -80,6 +79,7 @@ contract Archermes {
     event TrackingUpdated(uint256 indexed orderId, string trackingCode);
     event FundsReleased(uint256 indexed orderId, address seller, uint256 amount);
     event OrderRefunded(uint256 indexed orderId, address buyer, uint256 amount);
+    event StoreRated(address indexed seller, uint8 rating, uint256 newTotalStars, uint256 newReviewCount);
 
     // ── Modifiers ────────────────────────────────────────────────────────────
     modifier onlyOwner()  { require(msg.sender == owner,  "Not owner");       _; }
@@ -119,7 +119,9 @@ contract Archermes {
             storeName:    _name,
             expiresAt:    block.timestamp + STORE_DURATION,
             tier:         _isPro ? 1 : 0,
-            productCount: 0
+            productCount: 0,
+            totalStars:   0,
+            reviewCount:  0
         });
         emit StoreCreated(msg.sender, _name, _isPro ? 1 : 0);
     }
@@ -269,18 +271,25 @@ contract Archermes {
         emit TrackingUpdated(_orderId, _trackingCode);
     }
 
-    /// @notice Buyer confirms delivery — releases escrow to seller
-    function releaseFunds(uint256 _orderId) external {
+    /// @notice Buyer confirms delivery with a 1-7 star rating — releases escrow to seller
+    function releaseFunds(uint256 _orderId, uint8 _rating) external {
         Order storage o = orders[_orderId];
         require(msg.sender == o.buyer || msg.sender == owner, "Not buyer or admin");
         require(o.status == STATUS_SHIPPED, "Order not shipped");
+        require(_rating >= 1 && _rating <= 7, "Rating must be 1-7");
 
         uint256 amt = o.amount;
         o.amount = 0;
         o.status = STATUS_COMPLETED;
         if (amt > 0) o.seller.transfer(amt);
 
+        // Accumulate rating on seller's store profile
+        Store storage sellerStore = stores[o.seller];
+        sellerStore.totalStars  += _rating;
+        sellerStore.reviewCount += 1;
+
         emit FundsReleased(_orderId, o.seller, amt);
+        emit StoreRated(o.seller, _rating, sellerStore.totalStars, sellerStore.reviewCount);
     }
 
     /// @notice Seller or admin refunds buyer (e.g. cancellation before shipment)
@@ -305,5 +314,14 @@ contract Archermes {
 
     function getOrdersBySeller(address _seller) external view returns (uint256[] memory) {
         return _sellerOrders[_seller];
+    }
+
+    /// @notice Returns (totalStars, reviewCount, avgX100) for a seller's store.
+    ///         avgX100 = (totalStars * 100) / reviewCount  (e.g. 650 = 6.50 stars)
+    function getStoreRating(address _seller) external view returns (uint256 totalStars, uint256 reviewCount, uint256 avgX100) {
+        Store storage s = stores[_seller];
+        totalStars  = s.totalStars;
+        reviewCount = s.reviewCount;
+        avgX100     = (reviewCount > 0) ? (totalStars * 100) / reviewCount : 0;
     }
 }

@@ -449,7 +449,7 @@ export default function HomePage() {
   const [escrowAtivo, setEscrowAtivo] = useState(true);
 
   // ── LEADERBOARD ──
-  type LeaderboardSeller = { address: string; storeName: string; avatarUrl?: string; salesCount: number };
+  type LeaderboardSeller = { address: string; storeName: string; avatarUrl?: string; salesCount: number; avgX100?: number; reviewCount?: number };
   type LeaderboardBuyer  = { address: string; buyCount: number };
   const [leaderboardSellers, setLeaderboardSellers] = useState<LeaderboardSeller[]>([]);
   const [leaderboardBuyers,  setLeaderboardBuyers]  = useState<LeaderboardBuyer[]>([]);
@@ -461,6 +461,7 @@ export default function HomePage() {
   const [carregandoCompras, setCarregandoCompras] = useState(false);
   const [confirmandoId, setConfirmandoId] = useState<number | null>(null);
   const [confirmErro, setConfirmErro] = useState<Record<number, string>>({});
+  const [homeRatingModal, setHomeRatingModal] = useState<{ orderId: number; hover: number; selected: number } | null>(null);
 
   const carregarVitrine = useCallback(async () => {
     setCarregandoVitrine(true);
@@ -664,13 +665,28 @@ export default function HomePage() {
           .map(([address, buyCount]) => ({ address, buyCount }));
 
         const registry = getStoreRegistry();
-        const topSellers: LeaderboardSeller[] = Array.from(sellerCount.entries())
+        const top3Sellers = Array.from(sellerCount.entries())
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([address, salesCount]) => {
-            const store = registry.find((s) => s.address.toLowerCase() === address);
-            return { address, storeName: store?.storeName ?? abreviarEndereco(address), avatarUrl: store?.avatarUrl, salesCount };
-          });
+          .slice(0, 3);
+
+        // Fetch star ratings for each top seller
+        const ratingsSettled = await Promise.allSettled(
+          top3Sellers.map(([addr]) =>
+            (contrato.getStoreRating(addr) as Promise<[bigint, bigint, bigint]>).catch(() => null)
+          )
+        );
+
+        const topSellers: LeaderboardSeller[] = top3Sellers.map(([address, salesCount], idx) => {
+          const store = registry.find((s) => s.address.toLowerCase() === address);
+          const ratingResult = ratingsSettled[idx].status === 'fulfilled' ? ratingsSettled[idx].value : null;
+          let avgX100: number | undefined;
+          let reviewCount: number | undefined;
+          if (ratingResult) {
+            avgX100 = Number(ratingResult[2]);
+            reviewCount = Number(ratingResult[1]);
+          }
+          return { address, storeName: store?.storeName ?? abreviarEndereco(address), avatarUrl: store?.avatarUrl, salesCount, avgX100, reviewCount };
+        });
 
         setLeaderboardSellers(topSellers);
         setLeaderboardBuyers(topBuyers);
@@ -711,8 +727,9 @@ export default function HomePage() {
     setCarregandoCompras(false);
   }, [walletAddress]);
 
-  async function handleConfirmarRecebimento(orderId: number) {
+  async function handleConfirmarRecebimento(orderId: number, rating: number) {
     if (!isConnected) return;
+    setHomeRatingModal(null);
     setConfirmandoId(orderId);
     setConfirmErro((p) => ({ ...p, [orderId]: '' }));
     try {
@@ -721,7 +738,7 @@ export default function HomePage() {
       if (!provider) throw new Error('No provider');
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      const tx = await contrato.releaseFunds(orderId);
+      const tx = await contrato.releaseFunds(orderId, rating);
       await tx.wait();
       await carregarMinhasCompras();
     } catch (err: unknown) {
@@ -1100,123 +1117,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ── LOJAS VIP ── */}
-      {lojasVip.length > 0 && (
-        <section className="vitrine-container" style={{ paddingTop: '2rem', paddingBottom: '0.5rem' }}>
-          <div className="flex items-center gap-3 mb-5">
-            <span className="text-lg" style={{ filter: 'drop-shadow(0 0 8px #fbbf24)' }}>⚡</span>
-            <h2 className="text-base font-black tracking-widest uppercase"
-              style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24',
-                textShadow: '0 0 16px rgba(251,191,36,0.5)' }}>
-              {t('section.featured')}
-            </h2>
-            <span className="text-[10px] text-white/30 tracking-widest font-mono ml-1">VIP PRO MEMBERS</span>
-          </div>
-          <div ref={carrosselRef} className="flex gap-4 overflow-x-auto pb-3 scroll-oculto">
-            {lojasVip.map((loja) => (
-              <div key={loja.address} className="loja-vip-card">
-                <div className="loja-vip-avatar">⬡</div>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="loja-vip-nome">{loja.storeName}</span>
-                  <span className="text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full"
-                    style={{ fontFamily: "'Orbitron', sans-serif",
-                      background: 'rgba(192,132,252,0.15)', color: '#c084fc',
-                      border: '1px solid rgba(192,132,252,0.3)' }}>
-                    ⚡ VIP PRO
-                  </span>
-                  <span className="text-[10px] text-white/30 mt-0.5">
-                    {loja.productCount} {lang === 'en'
-                      ? `product${loja.productCount !== 1 ? 's' : ''}`
-                      : `produto${loja.productCount !== 1 ? 's' : ''}`}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
-        </section>
-      )}
-
-      {/* ── LOJAS PARCEIRAS ── */}
-      <section className="vitrine-container" style={{ paddingTop: '2.5rem', paddingBottom: '0' }}>
-        <div className="flex items-center gap-3 mb-6">
-          <span style={{ fontSize: '1.1rem', filter: 'drop-shadow(0 0 8px #00e5ff)' }}>⬡</span>
-          <div>
-            <h2 className="text-xl font-black tracking-widest uppercase"
-              style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
-                textShadow: '0 0 20px rgba(0,229,255,0.5)' }}>
-              {t('section.partners')}
-            </h2>
-            <p className="text-white/30 text-xs tracking-wide mt-0.5">
-              {t('section.partnersDesc')}
-            </p>
-          </div>
-        </div>
-        <div className="parceiras-scroll">
-          {(lojasReais.length > 0 ? lojasReais.map((store): LojaParceiraMock => ({
-            id: store.address,
-            nome: store.storeName,
-            cor: store.neonColor,
-            corSombra: getNeonShadow(store.neonColor),
-            banner: store.bannerUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=100&fit=crop',
-            logo: store.avatarUrl || 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=80&h=80&fit=crop',
-            produtos: produtosImpulsionados
-              .filter((p) => p.storeAddress.toLowerCase() === store.address.toLowerCase())
-              .slice(0, 4)
-              .map((p) => p.image),
-          })) : MOCK_LOJAS_PARCEIRAS).map((loja) => (
-            <div key={loja.id} className="parceira-card"
-              role="button"
-              tabIndex={0}
-              style={{ borderColor: loja.cor + '30', cursor: 'pointer' }}
-              onClick={() => verLoja(loja.id)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') verLoja(loja.id); }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = `0 8px 28px ${loja.corSombra}`;
-                (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '66';
-                (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '';
-                (e.currentTarget as HTMLDivElement).style.borderColor = loja.cor + '30';
-                (e.currentTarget as HTMLDivElement).style.transform = '';
-              }}>
-
-              {/* Banner */}
-              <img src={loja.banner} alt="" className="parceira-banner" loading="lazy" />
-
-              {/* Logo overlapping banner */}
-              <div className="parceira-logo-area">
-                <div className="parceira-logo-wrap" style={{
-                  borderColor: loja.cor,
-                  boxShadow: `0 0 14px ${loja.corSombra}`,
-                }}>
-                  <img src={loja.logo} alt={loja.nome} className="parceira-logo-img" loading="lazy" />
-                </div>
-                <span className="parceira-nome" style={{ color: loja.cor }}>
-                  {loja.nome}
-                </span>
-              </div>
-
-              {/* Products grid */}
-              <div className="parceira-body">
-                <div className="parceira-mini-grid">
-                  {loja.produtos.length > 0 ? loja.produtos.map((img, i) => (
-                    <img key={i} src={img} alt="" className="parceira-thumb" loading="lazy" />
-                  )) : (
-                    <div className="col-span-2 flex items-center justify-center h-full opacity-20 text-xs tracking-widest"
-                      style={{ fontFamily: "'Orbitron', sans-serif", color: loja.cor }}>
-                      ⬡
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-8" />
-      </section>
-
       {/* ── PRODUTOS IMPULSIONADOS ── */}
       <section className="vitrine-container" style={{ paddingTop: '2.5rem', paddingBottom: '0' }}>
         <div className="flex items-center gap-3 mb-6">
@@ -1306,6 +1206,85 @@ export default function HomePage() {
         <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       </section>
 
+      {/* ── FEATURED VIP STORES ── */}
+      {lojasVip.length > 0 && (
+        <section className="vitrine-container" style={{ paddingTop: '2.5rem', paddingBottom: '0.5rem' }}>
+          <div className="flex items-center gap-3 mb-6">
+            <span style={{ fontSize: '1.1rem', filter: 'drop-shadow(0 0 10px #c084fc)' }}>👑</span>
+            <div>
+              <h2 className="text-xl font-black tracking-widest uppercase"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: '#c084fc',
+                  textShadow: '0 0 20px rgba(192,132,252,0.5)' }}>
+                {t('section.featured')}
+              </h2>
+              <p className="text-white/30 text-xs tracking-wide mt-0.5">VIP PRO MEMBERS</p>
+            </div>
+          </div>
+          <div ref={carrosselRef} className="flex gap-5 overflow-x-auto pb-4 scroll-oculto">
+            {lojasVip.map((loja) => {
+              const reg = lojasReais.find((s) => s.address.toLowerCase() === loja.address.toLowerCase());
+              const bannerUrl = reg?.bannerUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&h=200&fit=crop';
+              const avatarUrl = reg?.avatarUrl;
+              return (
+                <div
+                  key={loja.address}
+                  className="flex-shrink-0 rounded-2xl overflow-hidden relative cursor-pointer"
+                  style={{
+                    width: '200px',
+                    background: 'linear-gradient(145deg, rgba(192,132,252,0.12), rgba(10,13,26,0.96))',
+                    border: '1.5px solid rgba(192,132,252,0.35)',
+                    boxShadow: '0 0 28px rgba(192,132,252,0.18)',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onClick={() => verLoja(loja.address)}
+                  role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter') verLoja(loja.address); }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 40px rgba(192,132,252,0.35), 0 8px 20px rgba(0,0,0,0.5)';
+                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 28px rgba(192,132,252,0.18)';
+                    (e.currentTarget as HTMLDivElement).style.transform = '';
+                  }}>
+                  {/* Banner */}
+                  <div className="relative h-20 overflow-hidden">
+                    <img src={bannerUrl} alt="" className="w-full h-full object-cover" loading="lazy"
+                      style={{ filter: 'brightness(0.6) saturate(1.2)' }} />
+                    <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 40%, rgba(10,13,26,0.9))' }} />
+                  </div>
+                  {/* Avatar overlapping banner */}
+                  <div className="relative -mt-8 flex flex-col items-center px-3 pb-4">
+                    <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center"
+                      style={{ border: '2.5px solid rgba(192,132,252,0.7)', boxShadow: '0 0 16px rgba(192,132,252,0.4)', background: 'rgba(16,20,40,0.9)' }}>
+                      {avatarUrl
+                        ? <img src={avatarUrl} alt={loja.storeName} className="w-full h-full object-cover" loading="lazy" />
+                        : <span style={{ fontSize: '1.4rem', color: '#c084fc' }}>⬡</span>}
+                    </div>
+                    <span className="text-[11px] font-black tracking-widest mt-2 text-center leading-tight"
+                      style={{ fontFamily: "'Orbitron', sans-serif", color: '#c084fc', textShadow: '0 0 10px rgba(192,132,252,0.4)' }}>
+                      {loja.storeName}
+                    </span>
+                    <span className="text-[8px] font-bold tracking-widest px-2 py-0.5 rounded-full mt-1.5"
+                      style={{ fontFamily: "'Orbitron', sans-serif",
+                        background: 'rgba(192,132,252,0.15)', color: '#c084fc',
+                        border: '1px solid rgba(192,132,252,0.35)' }}>
+                      ⚡ VIP PRO
+                    </span>
+                    <span className="text-[9px] text-white/30 mt-1.5">
+                      {loja.productCount} {lang === 'en'
+                        ? `product${loja.productCount !== 1 ? 's' : ''}`
+                        : `produto${loja.productCount !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
+        </section>
+      )}
+
       {/* ── 🏆 TOP ARCHITECTS LEADERBOARD ── */}
       <section id="leaderboard" className="vitrine-container leaderboard-section">
         {/* ── Botão compacto "Campeões do Mercado" ── */}
@@ -1385,9 +1364,17 @@ export default function HomePage() {
                                i === 1 ? { color: '#c8d4e8' } : { color: '#cd7f32' }) }}>
                           {seller.storeName}
                         </span>
-                        <span className="text-white/30 text-[10px] font-mono truncate">
-                          {abreviarEndereco(seller.address)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-white/30 text-[10px] font-mono truncate">
+                            {abreviarEndereco(seller.address)}
+                          </span>
+                          {seller.reviewCount !== undefined && seller.reviewCount > 0 && (
+                            <span className="text-[9px] font-bold flex-shrink-0"
+                              style={{ color: '#fbbf24', textShadow: '0 0 6px rgba(251,191,36,0.5)' }}>
+                              ★ {((seller.avgX100 ?? 0) / 100).toFixed(1)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="text-xs font-black flex-shrink-0 tabular-nums"
                         style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '0.65rem',
@@ -1454,6 +1441,55 @@ export default function HomePage() {
         </div>
         <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
       </section>
+
+      {/* ── LOJAS PARCEIRAS (compact circles) ── */}
+      {lojasReais.length > 0 && (
+        <section className="vitrine-container" style={{ paddingTop: '2rem', paddingBottom: '0' }}>
+          <div className="flex items-center gap-3 mb-4">
+            <span style={{ fontSize: '1rem', filter: 'drop-shadow(0 0 8px #00e5ff)' }}>⬡</span>
+            <h2 className="text-sm font-black tracking-widest uppercase"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff',
+                textShadow: '0 0 14px rgba(0,229,255,0.4)' }}>
+              {t('section.partners')}
+            </h2>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-3 scroll-oculto flex-wrap">
+            {lojasReais.map((store) => (
+              <button
+                key={store.address}
+                onClick={() => verLoja(store.address)}
+                className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem' }}>
+                <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                  style={{
+                    border: `2px solid ${store.neonColor}44`,
+                    boxShadow: `0 0 0 rgba(0,0,0,0)`,
+                    background: 'rgba(255,255,255,0.04)',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = `0 0 16px ${store.neonColor}66`;
+                    (e.currentTarget as HTMLDivElement).style.borderColor = `${store.neonColor}99`;
+                    (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.08)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 0 rgba(0,0,0,0)';
+                    (e.currentTarget as HTMLDivElement).style.borderColor = `${store.neonColor}44`;
+                    (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+                  }}>
+                  {store.avatarUrl
+                    ? <img src={store.avatarUrl} alt={store.storeName} className="w-full h-full object-cover" loading="lazy" />
+                    : <span style={{ fontSize: '1.2rem', color: store.neonColor }}>⬡</span>}
+                </div>
+                <span className="text-[9px] font-bold tracking-wide text-center max-w-[56px] leading-tight truncate"
+                  style={{ fontFamily: "'Orbitron', sans-serif", color: store.neonColor, opacity: 0.8 }}>
+                  {store.storeName}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mt-6" />
+        </section>
+      )}
 
       {/* ── MINHAS COMPRAS ── */}
       {isConnected && walletAddress && (
@@ -1541,11 +1577,11 @@ export default function HomePage() {
                             </p>
                           )}
 
-                          {/* Shipped: botão de confirmar entrega */}
+                          {/* Shipped: botão de confirmar entrega — abre modal de avaliação */}
                           {compra.status === 1 && (
                             <div className="flex flex-col gap-2">
                               <button
-                                onClick={() => void handleConfirmarRecebimento(compra.orderId)}
+                                onClick={() => setHomeRatingModal({ orderId: compra.orderId, hover: 0, selected: 0 })}
                                 disabled={confirmandoId === compra.orderId}
                                 className="btn-neon btn-neon-full"
                                 style={{ borderColor: '#4ade80', color: confirmandoId === compra.orderId ? '#ffffff50' : '#4ade80', background: 'rgba(74,222,128,0.05)', fontSize: '0.7rem' }}>
@@ -2161,6 +2197,87 @@ export default function HomePage() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── HOME RATING MODAL (7 estrelas — Minhas Compras) ── */}
+      {homeRatingModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)' }}
+          onClick={() => setHomeRatingModal(null)}>
+          <div
+            className="relative rounded-2xl p-7 flex flex-col gap-5 items-center"
+            style={{
+              background: 'linear-gradient(145deg, rgba(10,13,26,0.98), rgba(16,20,40,0.98))',
+              border: '1.5px solid rgba(74,222,128,0.3)',
+              boxShadow: '0 0 60px rgba(74,222,128,0.15), 0 0 120px rgba(0,229,255,0.08)',
+              maxWidth: '380px', width: '90%',
+            }}
+            onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setHomeRatingModal(null)}
+              className="absolute top-3 right-4 text-white/30 hover:text-white/60 text-lg transition-colors">
+              ✕
+            </button>
+            <div className="text-center">
+              <p className="text-xs font-black tracking-widest uppercase mb-1"
+                style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', textShadow: '0 0 12px rgba(74,222,128,0.4)' }}>
+                {lang === 'en' ? '⭐ RATE THIS SELLER' : '⭐ AVALIAR VENDEDOR'}
+              </p>
+              <p className="text-white/40 text-[11px]">
+                {lang === 'en'
+                  ? 'Select a rating before releasing payment'
+                  : 'Escolha uma nota antes de liberar o pagamento'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {[1,2,3,4,5,6,7].map((star) => {
+                const active = star <= (homeRatingModal.hover || homeRatingModal.selected);
+                return (
+                  <button
+                    key={star}
+                    onMouseEnter={() => setHomeRatingModal((m) => m ? { ...m, hover: star } : m)}
+                    onMouseLeave={() => setHomeRatingModal((m) => m ? { ...m, hover: 0 } : m)}
+                    onClick={() => setHomeRatingModal((m) => m ? { ...m, selected: star } : m)}
+                    style={{
+                      fontSize: '1.8rem',
+                      filter: active ? 'drop-shadow(0 0 6px rgba(251,191,36,0.7))' : 'none',
+                      opacity: active ? 1 : 0.25,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      transform: active ? 'scale(1.15)' : 'scale(1)',
+                      background: 'none', border: 'none', padding: '0.1rem',
+                    }}>
+                    ★
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] font-bold tracking-widest text-center"
+              style={{ fontFamily: "'Orbitron', sans-serif", color: homeRatingModal.selected > 0 ? '#fbbf24' : 'rgba(255,255,255,0.2)', minHeight: '1.2rem' }}>
+              {homeRatingModal.selected > 0
+                ? `${homeRatingModal.selected}/7 ${lang === 'en' ? 'stars' : 'estrelas'}`
+                : lang === 'en' ? 'Tap a star to rate' : 'Toque em uma estrela'}
+            </p>
+            <button
+              onClick={() => {
+                if (homeRatingModal.selected < 1) return;
+                void handleConfirmarRecebimento(homeRatingModal.orderId, homeRatingModal.selected);
+              }}
+              disabled={homeRatingModal.selected < 1}
+              className="w-full py-3 rounded-xl font-black tracking-widest uppercase text-sm transition-all"
+              style={{
+                fontFamily: "'Orbitron', sans-serif",
+                background: homeRatingModal.selected > 0 ? 'rgba(74,222,128,0.18)' : 'rgba(74,222,128,0.05)',
+                border: homeRatingModal.selected > 0 ? '1.5px solid rgba(74,222,128,0.6)' : '1.5px solid rgba(74,222,128,0.15)',
+                color: homeRatingModal.selected > 0 ? '#4ade80' : 'rgba(74,222,128,0.3)',
+                boxShadow: homeRatingModal.selected > 0 ? '0 0 20px rgba(74,222,128,0.2)' : 'none',
+                cursor: homeRatingModal.selected > 0 ? 'pointer' : 'not-allowed',
+              }}>
+              {lang === 'en' ? '✅ CONFIRM & RELEASE PAYMENT' : '✅ CONFIRMAR & LIBERAR PAGAMENTO'}
+            </button>
           </div>
         </div>
       )}
