@@ -417,7 +417,9 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       const signer = await provider.getSigner();
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-      // Admin (contract owner) pays no store fee — contract has admin bypass.
+      // GOD MODE: admin always pays 0 ETH — bypass fee calculation entirely.
+      // Manual gasLimit prevents gas estimation phase (which would fail for non-owner
+      // wallets if the estimator contacts the wrong contract state).
       let taxa = 0n;
       if (!isAdmin) {
         const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
@@ -425,8 +427,11 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
         taxa = isPro ? await c2.proStoreFee() : await c2.basicStoreFee();
       }
 
+      const txOpts: Record<string, unknown> = { value: taxa };
+      if (isAdmin) txOpts.gasLimit = 300000n; // skip gas estimation for admin
+
       console.log('[ARCHERMES] createStore:', { nome: nomeLoja.trim(), isPro, taxa: taxa.toString(), isAdmin });
-      const tx = await contrato.createStore(nomeLoja.trim(), isPro, { value: taxa });
+      const tx = await contrato.createStore(nomeLoja.trim(), isPro, txOpts);
       await tx.wait();
       setEstado('sucesso');
       // Reload store data after creation so UI reflects the new store immediately

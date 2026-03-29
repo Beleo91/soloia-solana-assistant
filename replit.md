@@ -101,7 +101,8 @@ Utility scripts package. Each script is a `.ts` file in `src/` with a correspond
 Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript + Tailwind CSS v4.
 
 **Chain**: Arc Testnet (chainId 5042002), RPC: `https://rpc.testnet.arc.network`, Explorer: `https://testnet.arcscan.app`
-**Contract v5 (ACTIVE)**: `0xd16FA8418D52aAf71BCc00036f1FDaA5A684Cce7` (deployed 2026-03-29, tx `0xb8c437…`, block 34420326)
+**Contract v6 (ACTIVE)**: `0xA809EB74d8202d1d6a8849bE6ac4D19B85f91437` (deployed 2026-03-29, tx `0x3f71af…`, block 34427331)
+**Contract v5 (deprecated)**: `0xd16FA8418D52aAf71BCc00036f1FDaA5A684Cce7`
 **Contract v4 (deprecated)**: `0x78cd1587e4CA8e052A7672faF43F0Cfb16D16447`
 **Contract v3 (deprecated)**: `0x4ba9BDBCA5Bb8aF32B30F5F7bA5Ef58BA7B09557`
 **Auth**: Privy (`@privy-io/react-auth`)
@@ -113,9 +114,9 @@ Cyberpunk-styled Web3 marketplace frontend built with React + Vite + TypeScript 
 - `src/chains.ts` — arcTestnet chain config
 - `src/stablecoins.ts` — USDC/EURC ERC-20 helpers (approveERC20, transferERC20)
 - `src/contractUtils.ts` — shared `extractContractError` helper
-- `contracts/Archermes.sol` — v5 source with 7-star rating system
+- `contracts/Archermes.sol` — v6 source with GOD_MODE_ADMIN + 7-star rating system
 
-**v5 Contract (escrow + 7-star rating)**:
+**v6 Contract (escrow + 7-star rating + GOD_MODE_ADMIN)**:
 - `Order` struct: `orderId, itemId, buyer, seller, amount, status (0=Pending/1=Shipped/2=Completed/3=Refunded), trackingCode`
 - `Store` struct: `storeName, expiresAt, tier, productCount, totalStars, reviewCount`
 - `buyItem(_itemId)` — creates Order, holds ETH in escrow

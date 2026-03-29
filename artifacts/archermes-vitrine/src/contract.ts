@@ -1,8 +1,10 @@
-// v5 — deployed 2026-03-29 — tx 0xb8c43794367a783b37b92fe5968c32917ab2b7b0fbb2300c69b6f7edcffb8cc0
-export const CONTRACT_ADDRESS = '0xd16FA8418D52aAf71BCc00036f1FDaA5A684Cce7';
+// v6 — deployed 2026-03-29 — tx 0x3f71afafe0af5c3350e1ad1450e1cc5ea0e8a98ed7f812deb903d5ac724c5525
+// GOD_MODE_ADMIN hardcoded in contract: 0x434189487484F20B9Bf0e0c28C1559B0c961274B
+export const CONTRACT_ADDRESS = '0xA809EB74d8202d1d6a8849bE6ac4D19B85f91437';
 
 export const CONTRACT_ABI = [
   // ── Admin ────────────────────────────────────────────────────────────────
+  { inputs: [], name: 'GOD_MODE_ADMIN', outputs: [{ internalType: 'address', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
   { inputs: [], name: 'togglePause', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_p', type: 'uint256' }, { internalType: 'uint256', name: '_r', type: 'uint256' }], name: 'setFeePercentages', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ internalType: 'uint256', name: '_basic', type: 'uint256' }, { internalType: 'uint256', name: '_pro', type: 'uint256' }], name: 'setStoreFees', outputs: [], stateMutability: 'nonpayable', type: 'function' },

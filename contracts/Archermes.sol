@@ -2,15 +2,22 @@
 pragma solidity ^0.8.20;
 
 /**
- * ARCHERMES Marketplace — v5
- * Changes vs v4:
- *  1. Store struct gains `totalStars` and `reviewCount` for 7-star rating system.
- *  2. releaseFunds(orderId, uint8 rating) now requires a rating 1-7.
- *     On release, stars are accumulated to the seller's store profile.
- *  3. New event `StoreRated` emitted on each completed review.
- *  4. New view `getStoreRating` returns (totalStars, reviewCount, avgX100).
+ * ARCHERMES Marketplace — v6
+ * Changes vs v5:
+ *  GOD_MODE_ADMIN is hardcoded as an immutable constant so that the platform
+ *  owner always has unrestricted access even if `owner` ever changes.
+ *  Admin bypasses:
+ *   - createStore : no fee, auto PRO tier, can always overwrite own store
+ *   - renewStore  : no fee
+ *   - upgradeToPro: no fee
+ *   - listItem    : no store/subscription check
+ *   - buyItem     : zero platform fee, can buy own items (for testing)
+ *  All admin functions accept value: 0 — no ETH ever required from admin.
  */
 contract Archermes {
+    // ── Immutable admin (hardcoded — cannot be changed) ──────────────────────
+    address public constant GOD_MODE_ADMIN = 0x434189487484F20B9Bf0e0c28C1559B0c961274B;
+
     address payable public owner;
     bool public paused;
 
@@ -46,8 +53,8 @@ contract Archermes {
         uint256  expiresAt;
         uint8    tier;
         uint256  productCount;
-        uint256  totalStars;    // sum of all ratings received (each 1-7)
-        uint256  reviewCount;   // number of reviews received
+        uint256  totalStars;
+        uint256  reviewCount;
     }
 
     struct Order {
@@ -55,8 +62,8 @@ contract Archermes {
         uint256         itemId;
         address payable buyer;
         address payable seller;
-        uint256         amount;       // escrowed amount (price - fees)
-        uint8           status;       // 0=Pending 1=Shipped 2=Completed 3=Refunded
+        uint256         amount;
+        uint8           status;
         string          trackingCode;
     }
 
@@ -64,7 +71,6 @@ contract Archermes {
     mapping(address => Store)   public stores;
     mapping(uint256 => Order)   public orders;
 
-    // Per-address order index lists for efficient frontend lookup
     mapping(address => uint256[]) private _buyerOrders;
     mapping(address => uint256[]) private _sellerOrders;
 
@@ -82,8 +88,13 @@ contract Archermes {
     event StoreRated(address indexed seller, uint8 rating, uint256 newTotalStars, uint256 newReviewCount);
 
     // ── Modifiers ────────────────────────────────────────────────────────────
-    modifier onlyOwner()  { require(msg.sender == owner,  "Not owner");       _; }
-    modifier notPaused()  { require(!paused,              "Contract paused"); _; }
+    modifier onlyOwner()  { require(_isAdmin(msg.sender), "Not owner");       _; }
+    modifier notPaused()  { require(!paused,               "Contract paused"); _; }
+
+    // ── Internal helper ──────────────────────────────────────────────────────
+    function _isAdmin(address addr) internal pure returns (bool) {
+        return addr == GOD_MODE_ADMIN;
+    }
 
     // ── Constructor ──────────────────────────────────────────────────────────
     constructor(address payable _admin) {
@@ -106,15 +117,25 @@ contract Archermes {
 
     // ── Store lifecycle ───────────────────────────────────────────────────────
     function createStore(string calldata _name, bool _isPro) external payable notPaused {
-        bool isAdmin = (msg.sender == owner);
-        if (!isAdmin) {
-            uint256 fee = _isPro ? proStoreFee : basicStoreFee;
-            require(msg.value >= fee, "Insufficient store fee");
-            if (fee > 0) owner.transfer(fee);
-            if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
-        } else {
+        if (_isAdmin(msg.sender)) {
+            // GOD MODE: refund any accidental ETH sent, create/overwrite store as PRO
             if (msg.value > 0) payable(msg.sender).transfer(msg.value);
+            stores[msg.sender] = Store({
+                storeName:    _name,
+                expiresAt:    block.timestamp + STORE_DURATION * 10, // 10 years
+                tier:         1, // always PRO
+                productCount: stores[msg.sender].productCount,        // preserve count
+                totalStars:   stores[msg.sender].totalStars,
+                reviewCount:  stores[msg.sender].reviewCount
+            });
+            emit StoreCreated(msg.sender, _name, 1);
+            return;
         }
+        // Normal user flow
+        uint256 fee = _isPro ? proStoreFee : basicStoreFee;
+        require(msg.value >= fee, "Insufficient store fee");
+        if (fee > 0) owner.transfer(fee);
+        if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
         stores[msg.sender] = Store({
             storeName:    _name,
             expiresAt:    block.timestamp + STORE_DURATION,
@@ -129,15 +150,15 @@ contract Archermes {
     function renewStore() external payable notPaused {
         Store storage s = stores[msg.sender];
         require(bytes(s.storeName).length > 0, "No store registered");
-        bool isAdmin = (msg.sender == owner);
-        if (!isAdmin) {
-            uint256 fee = s.tier == 1 ? proStoreFee : basicStoreFee;
-            require(msg.value >= fee, "Insufficient store fee");
-            if (fee > 0) owner.transfer(fee);
-            if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
-        } else {
+        if (_isAdmin(msg.sender)) {
             if (msg.value > 0) payable(msg.sender).transfer(msg.value);
+            s.expiresAt = block.timestamp + STORE_DURATION * 10;
+            return;
         }
+        uint256 fee = s.tier == 1 ? proStoreFee : basicStoreFee;
+        require(msg.value >= fee, "Insufficient store fee");
+        if (fee > 0) owner.transfer(fee);
+        if (msg.value > fee) payable(msg.sender).transfer(msg.value - fee);
         if (s.expiresAt > block.timestamp) {
             s.expiresAt += STORE_DURATION;
         } else {
@@ -148,16 +169,17 @@ contract Archermes {
     function upgradeToPro() external payable notPaused {
         Store storage s = stores[msg.sender];
         require(bytes(s.storeName).length > 0, "No store registered");
-        require(s.tier == 0, "Already pro");
-        bool isAdmin = (msg.sender == owner);
-        if (!isAdmin) {
-            uint256 diff = proStoreFee > basicStoreFee ? proStoreFee - basicStoreFee : proStoreFee;
-            require(msg.value >= diff, "Insufficient upgrade fee");
-            if (diff > 0) owner.transfer(diff);
-            if (msg.value > diff) payable(msg.sender).transfer(msg.value - diff);
-        } else {
+        if (_isAdmin(msg.sender)) {
             if (msg.value > 0) payable(msg.sender).transfer(msg.value);
+            s.tier = 1;
+            emit StoreUpgraded(msg.sender);
+            return;
         }
+        require(s.tier == 0, "Already pro");
+        uint256 diff = proStoreFee > basicStoreFee ? proStoreFee - basicStoreFee : proStoreFee;
+        require(msg.value >= diff, "Insufficient upgrade fee");
+        if (diff > 0) owner.transfer(diff);
+        if (msg.value > diff) payable(msg.sender).transfer(msg.value - diff);
         s.tier = 1;
         emit StoreUpgraded(msg.sender);
     }
@@ -174,9 +196,11 @@ contract Archermes {
         require(bytes(_itemName).length > 0, "Item name required");
 
         // Subscription / registration checks — disabled for open testing
-        // Store storage s = stores[msg.sender];
-        // require(bytes(s.storeName).length > 0, "No store registered");
-        // require(s.expiresAt >= block.timestamp, "Store subscription expired");
+        // if (!_isAdmin(msg.sender)) {
+        //     Store storage s = stores[msg.sender];
+        //     require(bytes(s.storeName).length > 0, "No store registered");
+        //     require(s.expiresAt >= block.timestamp, "Store subscription expired");
+        // }
 
         totalItems++;
         items[totalItems] = Item({
@@ -194,7 +218,7 @@ contract Archermes {
 
     function cancelItem(uint256 _id) external {
         Item storage item = items[_id];
-        require(msg.sender == item.seller || msg.sender == owner, "Not seller or admin");
+        require(msg.sender == item.seller || _isAdmin(msg.sender), "Not seller or admin");
         item.isActive = false;
         emit ItemCancelled(_id);
     }
@@ -211,14 +235,13 @@ contract Archermes {
         require(item.stock > 0,          "Produto esgotado");
         require(msg.value >= item.price, "Insufficient payment");
 
-        if (msg.sender != owner) {
+        // Admin can buy any item (including own) for testing
+        if (!_isAdmin(msg.sender)) {
             require(msg.sender != item.seller, "Cannot buy own item");
         }
 
-        // ── Fee math ────────────────────────────────────────────────────────
-        uint256 platFee = (msg.sender != owner)
-            ? (item.price * platformFeePercent) / 100
-            : 0;
+        // Admin pays zero platform fee
+        uint256 platFee = _isAdmin(msg.sender) ? 0 : (item.price * platformFeePercent) / 100;
         bool validRef = (
             _referrer != address(0) &&
             _referrer != item.seller &&
@@ -227,20 +250,13 @@ contract Archermes {
         uint256 refFee   = validRef ? (item.price * referralFeePercent) / 100 : 0;
         uint256 escrowed = item.price - platFee - refFee;
 
-        // Send platform and referral fees immediately; rest stays in contract
         if (platFee > 0) owner.transfer(platFee);
         if (refFee > 0 && validRef) _referrer.transfer(refFee);
+        if (msg.value > item.price) payable(msg.sender).transfer(msg.value - item.price);
 
-        // Refund overpayment
-        if (msg.value > item.price) {
-            payable(msg.sender).transfer(msg.value - item.price);
-        }
-
-        // Decrement stock; deactivate when sold out
         item.stock--;
         if (item.stock == 0) item.isActive = false;
 
-        // Create the Order
         totalOrders++;
         orders[totalOrders] = Order({
             orderId:      totalOrders,
@@ -259,22 +275,19 @@ contract Archermes {
 
     // ── Order management ─────────────────────────────────────────────────────
 
-    /// @notice Seller informs tracking code — marks order as Shipped
     function updateTracking(uint256 _orderId, string calldata _trackingCode) external {
         Order storage o = orders[_orderId];
-        require(msg.sender == o.seller || msg.sender == owner, "Not seller or admin");
+        require(msg.sender == o.seller || _isAdmin(msg.sender), "Not seller or admin");
         require(o.status == STATUS_PENDING, "Order not pending");
         require(bytes(_trackingCode).length > 0, "Tracking code required");
-
         o.trackingCode = _trackingCode;
         o.status       = STATUS_SHIPPED;
         emit TrackingUpdated(_orderId, _trackingCode);
     }
 
-    /// @notice Buyer confirms delivery with a 1-7 star rating — releases escrow to seller
     function releaseFunds(uint256 _orderId, uint8 _rating) external {
         Order storage o = orders[_orderId];
-        require(msg.sender == o.buyer || msg.sender == owner, "Not buyer or admin");
+        require(msg.sender == o.buyer || _isAdmin(msg.sender), "Not buyer or admin");
         require(o.status == STATUS_SHIPPED, "Order not shipped");
         require(_rating >= 1 && _rating <= 7, "Rating must be 1-7");
 
@@ -283,7 +296,6 @@ contract Archermes {
         o.status = STATUS_COMPLETED;
         if (amt > 0) o.seller.transfer(amt);
 
-        // Accumulate rating on seller's store profile
         Store storage sellerStore = stores[o.seller];
         sellerStore.totalStars  += _rating;
         sellerStore.reviewCount += 1;
@@ -292,10 +304,9 @@ contract Archermes {
         emit StoreRated(o.seller, _rating, sellerStore.totalStars, sellerStore.reviewCount);
     }
 
-    /// @notice Seller or admin refunds buyer (e.g. cancellation before shipment)
     function refundOrder(uint256 _orderId) external {
         Order storage o = orders[_orderId];
-        require(msg.sender == o.seller || msg.sender == owner, "Not seller or admin");
+        require(msg.sender == o.seller || _isAdmin(msg.sender), "Not seller or admin");
         require(o.status == STATUS_PENDING || o.status == STATUS_SHIPPED, "Cannot refund");
 
         uint256 amt = o.amount;
@@ -316,8 +327,6 @@ contract Archermes {
         return _sellerOrders[_seller];
     }
 
-    /// @notice Returns (totalStars, reviewCount, avgX100) for a seller's store.
-    ///         avgX100 = (totalStars * 100) / reviewCount  (e.g. 650 = 6.50 stars)
     function getStoreRating(address _seller) external view returns (uint256 totalStars, uint256 reviewCount, uint256 avgX100) {
         Store storage s = stores[_seller];
         totalStars  = s.totalStars;
