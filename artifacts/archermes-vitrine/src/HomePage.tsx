@@ -808,50 +808,117 @@ export default function HomePage() {
         return;
       }
     }
+    if (!isConnected) { setEstado('sem-carteira'); return; }
+
+    // ── Step 1: switch to Arc Testnet (non-fatal for admin) ────────────────
     try {
-      if (!isConnected) { setEstado('sem-carteira'); return; }
       await switchToArc();
-      const provider = getProvider();
-      if (!provider) { setEstado('sem-carteira'); return; }
-      const signer = await provider.getSigner();
-      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-      // ABI v3: listItem(name: string, price: uint256, category: string, stock: uint256)
-      const precoWei = parseUnits(precoStr, 18);
-      const estoque  = BigInt(Math.max(1, formEstoque));
-      // ── Debug payload ──────────────────────────────────────────────────────
-      console.log('[ARCHERMES] listItem payload (v3):', {
-        nomeItem,
-        precoStr,
-        precoWei: precoWei.toString(),
-        categoria: form.categoria,
-        estoque: estoque.toString(),
-        contract: CONTRACT_ADDRESS,
-        caller: await signer.getAddress(),
-      });
-      const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
-      await tx.wait();
-      // Persist hosted image URLs for this new listing.
-      // formImagesBase64 already contains absolute https:// ImgBB URLs (uploaded
-      // eagerly when the user selected the files). Filter to only hosted URLs to
-      // be safe, then push to the API image-map so ALL clients see the images.
-      if (formImagesBase64.length > 0) {
+    } catch (switchErr) {
+      console.warn('[ARCHERMES] switchToArc failed in handlePublicar:', switchErr);
+      if (!isAdminWallet) {
+        setErroMsg('Falha ao mudar para Arc Testnet. ' + extractContractError(switchErr));
+        setEstado('erro');
+        return;
+      }
+    }
+
+    const provider = getProvider();
+    if (!provider) { setEstado('sem-carteira'); return; }
+
+    const precoWei = parseUnits(precoStr, 18);
+    const estoque  = BigInt(Math.max(1, formEstoque));
+
+    try {
+      let finalTxHash = '';
+
+      if (isAdminWallet) {
+        // ── GOD MODE: raw eth_sendTransaction bypasses Rabby gas estimation ──
+        // listItem is nonpayable — value: '0x0', gas: 500000 hardcoded
+        const eth = (window as unknown as {
+          ethereum: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
+        }).ethereum;
+        if (!eth) throw new Error('window.ethereum not available');
+
+        const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+        const iface = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
+        const data = iface.interface.encodeFunctionData('listItem', [
+          nomeItem, precoWei, form.categoria, estoque,
+        ]);
+
+        console.log('[ARCHERMES] GOD MODE listItem (raw tx):', {
+          from: walletAddress, to: CONTRACT_ADDRESS, nomeItem,
+          preco: precoStr, categoria: form.categoria, estoque: estoque.toString(), gas: '0x7A120',
+        });
+
+        const txHash = await eth.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: walletAddress,
+            to: CONTRACT_ADDRESS,
+            data,
+            value: '0x0',
+            gas: '0x7A120', // 500000 — hardcoded, bypasses estimation
+          }],
+        }) as string;
+
+        console.log('[ARCHERMES] GOD MODE listItem tx sent:', txHash);
+        finalTxHash = txHash;
+
+        // Wait for confirmation via polling
+        await new Promise<void>((resolve, reject) => {
+          const interval = setInterval(() => {
+            rpc.getTransactionReceipt(txHash).then((receipt) => {
+              if (receipt) {
+                clearInterval(interval);
+                if (receipt.status === 1) resolve();
+                else reject(new Error('Transaction reverted on-chain'));
+              }
+            }).catch(() => {});
+          }, 2000);
+          setTimeout(() => { clearInterval(interval); reject(new Error('Timeout waiting for tx')); }, 60000);
+        });
+
+        // Get the new item ID after confirmation
         try {
-          const newTotal: bigint = await contrato.totalItems();
+          const newTotal: bigint = await rpc.call({
+            to: CONTRACT_ADDRESS,
+            data: iface.interface.encodeFunctionData('totalItems'),
+          }).then((r) => BigInt(r));
           const newId = Number(newTotal);
           const hostedUrls = formImagesBase64.filter((u) => u.startsWith('https://'));
           if (hostedUrls.length > 0) {
             localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(hostedUrls));
             void saveImageMap(newId, hostedUrls);
           }
-        } catch { /* ignore */ }
-      }
-      setTxHash(tx.hash);
-      setEstado('sucesso');
-      // Show "Atualizando vitrine..." spinner only during the background reload.
-      setPostListReloading(true);
+        } catch { /* ignore image persistence errors */ }
 
-      // Arc Testnet RPC nodes can take 1-3 s to propagate a new block to eth_call.
-      // Fire a first reload after 2 s; safety retry at 6 s; resolve the spinner.
+      } else {
+        // ── Normal user flow ─────────────────────────────────────────────────
+        const signer = await provider.getSigner();
+        const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        console.log('[ARCHERMES] listItem (user):', { nomeItem, precoStr, categoria: form.categoria, estoque: estoque.toString() });
+        const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
+        await tx.wait();
+        finalTxHash = tx.hash;
+
+        if (formImagesBase64.length > 0) {
+          try {
+            const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+            const c2 = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
+            const newTotal: bigint = await c2.totalItems();
+            const newId = Number(newTotal);
+            const hostedUrls = formImagesBase64.filter((u) => u.startsWith('https://'));
+            if (hostedUrls.length > 0) {
+              localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(hostedUrls));
+              void saveImageMap(newId, hostedUrls);
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      setTxHash(finalTxHash);
+      setEstado('sucesso');
+      setPostListReloading(true);
       setTimeout(() => {
         carregarVitrine();
         broadcastVitrineEvent({ type: 'product:listed', id: 0 });
@@ -860,7 +927,10 @@ export default function HomePage() {
         void carregarVitrine().finally(() => setPostListReloading(false));
       }, 6000);
     } catch (err: unknown) {
-      setErroMsg(extractContractError(err));
+      console.error('[ARCHERMES] handlePublicar error:', err);
+      const msg = extractContractError(err);
+      const raw = err instanceof Error ? err.message : String(err);
+      setErroMsg(msg + (msg === raw ? '' : '\n[debug: ' + raw.slice(0, 120) + ']'));
       setEstado('erro');
     }
   }
