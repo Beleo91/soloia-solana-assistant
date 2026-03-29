@@ -41,6 +41,16 @@ interface PedidoSeller {
   trackingCode: string;
 }
 
+interface PedidoCompra {
+  orderId: number;
+  itemId: number;
+  itemName: string;
+  seller: string;
+  amountEth: string;
+  status: number;
+  trackingCode: string;
+}
+
 interface Customizacao {
   avatarUrl: string;
   bannerUrl: string;
@@ -96,11 +106,19 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
 
   const [txStatus, setTxStatus] = useState<Record<number, string>>({});
 
-  // Pedidos (Order system)
+  // Pedidos — sub-tab
+  const [subAbaPedidos, setSubAbaPedidos] = useState<'vendas' | 'compras'>('vendas');
+
+  // Pedidos — visão VENDEDOR
   const [pedidos, setPedidos] = useState<PedidoSeller[]>([]);
   const [carregandoPedidos, setCarregandoPedidos] = useState(false);
   const [pedidoTracking, setPedidoTracking] = useState<Record<number, string>>({});
   const [pedidoTxStatus, setPedidoTxStatus] = useState<Record<number, string>>({});
+
+  // Pedidos — visão COMPRADOR
+  const [pedidosCompra, setPedidosCompra] = useState<PedidoCompra[]>([]);
+  const [carregandoPedidosCompra, setCarregandoPedidosCompra] = useState(false);
+  const [releaseStatus, setReleaseStatus] = useState<Record<number, 'liberando' | 'liberado' | 'erro'>>({});
 
   const [dragOverBanner, setDragOverBanner] = useState(false);
   const [dragOverAvatar, setDragOverAvatar] = useState(false);
@@ -311,9 +329,60 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   };
 
   useEffect(() => {
-    if (abaAtiva === 'pedidos' && isConnected) void carregarPedidos();
+    if (abaAtiva === 'pedidos' && isConnected) {
+      void carregarPedidos();
+      void carregarPedidosCompra();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abaAtiva, isConnected, enderecoUsuario]);
+
+  // Carregar pedidos feitos (como comprador)
+  const carregarPedidosCompra = async () => {
+    if (!enderecoUsuario) return;
+    setCarregandoPedidosCompra(true);
+    try {
+      const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      const orderIds: bigint[] = await contrato.getOrdersByBuyer(enderecoUsuario);
+      const lista: PedidoCompra[] = [];
+      await Promise.all(orderIds.map(async (oid) => {
+        try {
+          const o = await contrato.orders(Number(oid));
+          const it = await contrato.items(Number(o.itemId));
+          lista.push({
+            orderId: Number(o.orderId),
+            itemId: Number(o.itemId),
+            itemName: it.itemName as string,
+            seller: o.seller as string,
+            amountEth: formatUnits(o.amount as bigint, 18),
+            status: Number(o.status),
+            trackingCode: o.trackingCode as string,
+          });
+        } catch { /* skip */ }
+      }));
+      lista.sort((a, b) => b.orderId - a.orderId);
+      setPedidosCompra(lista);
+    } catch (err) { console.error('[carregarPedidosCompra]', err); }
+    finally { setCarregandoPedidosCompra(false); }
+  };
+
+  async function handleReleaseFunds(orderId: number) {
+    if (!isConnected) return;
+    setReleaseStatus((p) => ({ ...p, [orderId]: 'liberando' }));
+    try {
+      await switchToArc();
+      const provider = getProvider(); if (!provider) return;
+      const signer = await provider.getSigner();
+      const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      const tx = await contrato.releaseFunds(orderId);
+      await tx.wait();
+      setReleaseStatus((p) => ({ ...p, [orderId]: 'liberado' }));
+      setTimeout(() => void carregarPedidosCompra(), 2000);
+    } catch (err: unknown) {
+      setReleaseStatus((p) => ({ ...p, [orderId]: 'erro' }));
+      console.error('[handleReleaseFunds]', extractContractError(err));
+    }
+  }
 
   async function handleUpdateTracking(orderId: number, code: string) {
     if (!code.trim()) return;
@@ -943,143 +1012,312 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             </div>
           )}
 
-          {/* ABA: PEDIDOS A ENVIAR */}
+          {/* ABA: PEDIDOS — Central de Rastreio & Escrow */}
           {abaAtiva === 'pedidos' && (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5">
+
+              {/* ── HEADER ── */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="text-sm font-black tracking-widest uppercase"
-                    style={{ fontFamily: "'Orbitron', sans-serif", color: customizacao.neonColor }}>
-                    📦 {lang === 'en' ? 'Orders to Ship' : 'Pedidos a Enviar'}
+                    style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff', textShadow: '0 0 16px rgba(0,229,255,0.5)' }}>
+                    {lang === 'en' ? '⚡ ORDER CENTER' : '⚡ CENTRAL DE PEDIDOS'}
                   </h3>
-                  <p className="text-[10px] mt-0.5 text-white/30">
-                    {lang === 'en' ? 'Add tracking codes to release payment to your wallet' : 'Informe o código de rastreio para liberar o pagamento'}
+                  <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                    {lang === 'en' ? 'Unified escrow & tracking control panel' : 'Painel unificado de rastreio e liberação de fundos'}
                   </p>
                 </div>
-                <button onClick={() => void carregarPedidos()}
-                  className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
-                  style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                <button
+                  onClick={() => { void carregarPedidos(); void carregarPedidosCompra(); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all hover:scale-105"
+                  style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff', background: 'rgba(0,229,255,0.07)', border: '1px solid rgba(0,229,255,0.2)', boxShadow: '0 0 10px rgba(0,229,255,0.08)' }}>
                   ↺ {lang === 'en' ? 'Refresh' : 'Atualizar'}
                 </button>
               </div>
 
-              {carregandoPedidos && (
-                <div className="flex items-center justify-center py-12 gap-3">
-                  <div className="w-6 h-6 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
-                  <span className="text-cyan-400/60 text-xs tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    {lang === 'en' ? 'Loading orders…' : 'Carregando pedidos…'}
-                  </span>
-                </div>
-              )}
+              {/* ── SUB-TABS ── */}
+              <div className="flex rounded-xl overflow-hidden border border-white/10 p-1 gap-1"
+                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(12px)' }}>
+                {[
+                  { id: 'vendas', icon: '📦', label: lang === 'en' ? 'MY SALES' : 'MINHAS VENDAS', count: pedidos.length },
+                  { id: 'compras', icon: '🛒', label: lang === 'en' ? 'MY PURCHASES' : 'MINHAS COMPRAS', count: pedidosCompra.length },
+                ].map((tab) => {
+                  const isActive = subAbaPedidos === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setSubAbaPedidos(tab.id as 'vendas' | 'compras')}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all duration-200"
+                      style={{
+                        fontFamily: "'Orbitron', sans-serif",
+                        background: isActive ? (tab.id === 'vendas' ? 'rgba(0,229,255,0.12)' : 'rgba(192,132,252,0.12)') : 'transparent',
+                        color: isActive ? (tab.id === 'vendas' ? '#00e5ff' : '#c084fc') : 'rgba(255,255,255,0.3)',
+                        border: isActive ? `1px solid ${tab.id === 'vendas' ? 'rgba(0,229,255,0.35)' : 'rgba(192,132,252,0.35)'}` : '1px solid transparent',
+                        boxShadow: isActive ? `0 0 18px ${tab.id === 'vendas' ? 'rgba(0,229,255,0.15)' : 'rgba(192,132,252,0.15)'}` : 'none',
+                      }}>
+                      <span className="text-sm">{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      {tab.count > 0 && (
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold"
+                          style={{
+                            background: isActive ? (tab.id === 'vendas' ? 'rgba(0,229,255,0.25)' : 'rgba(192,132,252,0.25)') : 'rgba(255,255,255,0.08)',
+                            color: isActive ? (tab.id === 'vendas' ? '#00e5ff' : '#c084fc') : 'rgba(255,255,255,0.3)',
+                          }}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
 
-              {!carregandoPedidos && pedidos.length === 0 && (
-                <div className="flex flex-col items-center py-16 gap-4">
-                  <span className="text-5xl opacity-15">📦</span>
-                  <p className="text-white/30 text-xs tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                    {lang === 'en' ? 'No orders yet' : 'Nenhum pedido ainda'}
-                  </p>
-                </div>
-              )}
-
-              {!carregandoPedidos && pedidos.map((pedido) => {
-                const statusLabel =
-                  pedido.status === 0 ? { txt: lang === 'en' ? 'PENDING' : 'PENDENTE', cls: 'text-yellow-400 bg-yellow-500/10 border-yellow-400/30' }
-                  : pedido.status === 1 ? { txt: lang === 'en' ? 'SHIPPED' : 'ENVIADO', cls: 'text-cyan-400 bg-cyan-500/10 border-cyan-400/30' }
-                  : pedido.status === 2 ? { txt: lang === 'en' ? 'COMPLETED' : 'CONCLUÍDO', cls: 'text-green-400 bg-green-500/10 border-green-400/30' }
-                  : { txt: lang === 'en' ? 'REFUNDED' : 'REEMBOLSADO', cls: 'text-white/40 bg-white/5 border-white/10' };
-
-                return (
-                  <div key={pedido.orderId} className="rounded-xl border border-white/10 p-4 flex flex-col gap-3"
-                    style={{ background: 'rgba(255,255,255,0.03)' }}>
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-mono text-white/20">Order #{pedido.orderId}</span>
-                          <span className={`text-[9px] font-bold tracking-widest px-1.5 py-0.5 rounded-full border ${statusLabel.cls}`}
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                            {statusLabel.txt}
-                          </span>
-                        </div>
-                        <h4 className="font-bold text-sm text-white" style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.04em' }}>
-                          {pedido.itemName}
-                        </h4>
-                        <p className="text-white/30 text-xs mt-0.5">
-                          {lang === 'en' ? 'Buyer:' : 'Comprador:'} {pedido.buyer.slice(0, 8)}…{pedido.buyer.slice(-6)}
-                        </p>
-                        <p className="text-white/40 text-xs">
-                          {lang === 'en' ? 'Escrow:' : 'Em garantia:'}{' '}
-                          <span style={{ color: customizacao.neonColor, fontFamily: "'Orbitron', sans-serif", fontWeight: 700 }}>
-                            {parseFloat(pedido.amountEth).toFixed(6)} ETH
-                          </span>
-                        </p>
-                      </div>
+              {/* ══════════════════════════════════════ */}
+              {/* SUB-ABA: MINHAS VENDAS (Seller view)  */}
+              {/* ══════════════════════════════════════ */}
+              {subAbaPedidos === 'vendas' && (
+                <div className="flex flex-col gap-3">
+                  {carregandoPedidos && (
+                    <div className="flex items-center justify-center py-10 gap-3">
+                      <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#00e5ff', borderTopColor: 'transparent' }} />
+                      <span className="text-[11px] tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(0,229,255,0.5)' }}>
+                        {lang === 'en' ? 'Loading sales...' : 'Carregando vendas…'}
+                      </span>
                     </div>
+                  )}
 
-                    {/* Shipped: show tracking code */}
-                    {pedido.status === 1 && pedido.trackingCode && (
-                      <div className="rounded-lg px-3 py-2 border border-cyan-400/20"
-                        style={{ background: 'rgba(0,229,255,0.04)' }}>
-                        <p className="text-[10px] text-cyan-400/60 tracking-widest uppercase mb-0.5" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          {lang === 'en' ? 'Tracking code' : 'Código de Rastreio'}
-                        </p>
-                        <p className="text-sm font-mono text-cyan-300">{pedido.trackingCode}</p>
-                        <p className="text-[10px] text-white/30 mt-1">
-                          {lang === 'en' ? 'Waiting for buyer confirmation to release funds.' : 'Aguardando confirmação do comprador para liberar fundos.'}
-                        </p>
+                  {!carregandoPedidos && pedidos.length === 0 && (
+                    <div className="flex flex-col items-center py-14 gap-3">
+                      <span className="text-4xl" style={{ opacity: 0.12 }}>📦</span>
+                      <p className="text-[11px] tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(255,255,255,0.2)' }}>
+                        {lang === 'en' ? 'No sales yet' : 'Nenhuma venda ainda'}
+                      </p>
+                    </div>
+                  )}
+
+                  {!carregandoPedidos && pedidos.map((pedido) => (
+                    <div key={pedido.orderId}
+                      className="rounded-xl p-4 flex flex-col gap-3 transition-all"
+                      style={{ background: 'rgba(0,229,255,0.03)', border: '1px solid rgba(0,229,255,0.12)', backdropFilter: 'blur(10px)' }}>
+
+                      {/* Order header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[9px] font-mono" style={{ color: 'rgba(0,229,255,0.35)' }}>ORDER #{pedido.orderId}</span>
+                            {pedido.status === 0 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#fbbf24', background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.3)' }}>{lang === 'en' ? 'PENDING' : 'PENDENTE'}</span>}
+                            {pedido.status === 1 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff', background: 'rgba(0,229,255,0.1)', borderColor: 'rgba(0,229,255,0.3)' }}>{lang === 'en' ? 'SHIPPED' : 'ENVIADO'}</span>}
+                            {pedido.status === 2 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', background: 'rgba(74,222,128,0.1)', borderColor: 'rgba(74,222,128,0.3)' }}>✅ {lang === 'en' ? 'COMPLETED' : 'CONCLUÍDO'}</span>}
+                            {pedido.status === 3 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}>↩ {lang === 'en' ? 'REFUNDED' : 'REEMBOLSADO'}</span>}
+                          </div>
+                          <p className="font-bold text-sm text-white truncate" style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.03em' }}>
+                            {pedido.itemName}
+                          </p>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                              {lang === 'en' ? 'Buyer:' : 'Comprador:'} {pedido.buyer.slice(0, 8)}…{pedido.buyer.slice(-6)}
+                            </span>
+                            <span className="text-[10px] font-bold" style={{ fontFamily: "'Orbitron', sans-serif", color: '#00e5ff' }}>
+                              {parseFloat(pedido.amountEth).toFixed(6)} ETH {lang === 'en' ? '(escrow)' : '(garantia)'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Completed */}
-                    {pedido.status === 2 && (
-                      <div className="rounded-lg px-3 py-2 border border-green-400/20"
-                        style={{ background: 'rgba(74,222,128,0.04)' }}>
-                        <p className="text-green-400 text-xs font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          ✓ {lang === 'en' ? 'Payment released to your wallet!' : 'Pagamento liberado para sua carteira!'}
-                        </p>
+                      {/* Pending → input de rastreio */}
+                      {pedido.status === 0 && (
+                        <div className="flex flex-col gap-2.5">
+                          <p className="text-[10px] tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,191,36,0.7)' }}>
+                            ⏳ {lang === 'en' ? 'Ship the order and add the tracking code:' : 'Envie o produto e informe o código de rastreio:'}
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder={lang === 'en' ? 'Tracking code  (e.g. BR123456789)' : 'Código de rastreio (ex: BR123456789)'}
+                              value={pedidoTracking[pedido.orderId] ?? ''}
+                              onChange={(e) => setPedidoTracking((p) => ({ ...p, [pedido.orderId]: e.target.value }))}
+                              className="flex-1 px-3 py-2 rounded-lg text-xs font-mono text-white outline-none transition-all"
+                              style={{
+                                background: 'rgba(0,0,0,0.4)',
+                                border: '1px solid rgba(0,229,255,0.25)',
+                                boxShadow: 'inset 0 0 10px rgba(0,229,255,0.04)',
+                              }}
+                              onFocus={(e) => { e.currentTarget.style.border = '1px solid rgba(0,229,255,0.6)'; e.currentTarget.style.boxShadow = '0 0 14px rgba(0,229,255,0.15), inset 0 0 10px rgba(0,229,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.border = '1px solid rgba(0,229,255,0.25)'; e.currentTarget.style.boxShadow = 'inset 0 0 10px rgba(0,229,255,0.04)'; }}
+                            />
+                            <button
+                              onClick={() => void handleUpdateTracking(pedido.orderId, pedidoTracking[pedido.orderId] ?? '')}
+                              disabled={pedidoTxStatus[pedido.orderId] === 'enviando' || !(pedidoTracking[pedido.orderId] ?? '').trim()}
+                              className="px-4 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all duration-200"
+                              style={{
+                                fontFamily: "'Orbitron', sans-serif",
+                                background: (pedidoTracking[pedido.orderId] ?? '').trim() && pedidoTxStatus[pedido.orderId] !== 'enviando' ? 'rgba(74,222,128,0.15)' : 'rgba(255,255,255,0.04)',
+                                border: `1px solid ${(pedidoTracking[pedido.orderId] ?? '').trim() ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                color: (pedidoTracking[pedido.orderId] ?? '').trim() ? '#4ade80' : 'rgba(255,255,255,0.2)',
+                                boxShadow: (pedidoTracking[pedido.orderId] ?? '').trim() ? '0 0 14px rgba(74,222,128,0.2)' : 'none',
+                                cursor: (pedidoTracking[pedido.orderId] ?? '').trim() ? 'pointer' : 'not-allowed',
+                                whiteSpace: 'nowrap',
+                              }}>
+                              {pedidoTxStatus[pedido.orderId] === 'enviando'
+                                ? <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 border border-t-transparent border-green-400 rounded-full animate-spin" />{lang === 'en' ? 'Sending…' : 'Enviando…'}</span>
+                                : `📦 ${lang === 'en' ? 'Confirm Ship' : 'Confirmar Envio'}`}
+                            </button>
+                          </div>
+                          {pedidoTxStatus[pedido.orderId] === 'enviado' && (
+                            <p className="text-[11px] font-bold" style={{ color: '#4ade80' }}>✓ {lang === 'en' ? 'Tracking sent! Updating…' : 'Código enviado! Atualizando…'}</p>
+                          )}
+                          {pedidoTxStatus[pedido.orderId] === 'erro' && (
+                            <p className="text-[11px]" style={{ color: '#f87171' }}>⚠ {lang === 'en' ? 'Error. Try again.' : 'Erro ao enviar. Tente novamente.'}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Shipped → aguardando comprador */}
+                      {pedido.status === 1 && (
+                        <div className="rounded-lg px-3 py-2.5 flex flex-col gap-1.5"
+                          style={{ background: 'rgba(0,229,255,0.05)', border: '1px solid rgba(0,229,255,0.18)' }}>
+                          <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(0,229,255,0.5)' }}>
+                            {lang === 'en' ? 'Tracking Code' : 'Código de Rastreio'}
+                          </p>
+                          <p className="text-sm font-mono" style={{ color: '#00e5ff', letterSpacing: '0.08em' }}>{pedido.trackingCode}</p>
+                          <p className="text-[10px] flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                            ⏳ {lang === 'en' ? 'Waiting for buyer to confirm receipt' : 'Aguardando comprador confirmar o recebimento'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Completed */}
+                      {pedido.status === 2 && (
+                        <div className="rounded-lg px-3 py-2.5"
+                          style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)' }}>
+                          <p className="text-[11px] font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', textShadow: '0 0 8px rgba(74,222,128,0.4)' }}>
+                            ✅ {lang === 'en' ? 'Payment released to your wallet!' : 'Pagamento liberado para sua carteira!'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ══════════════════════════════════════════ */}
+              {/* SUB-ABA: MINHAS COMPRAS (Buyer view)      */}
+              {/* ══════════════════════════════════════════ */}
+              {subAbaPedidos === 'compras' && (
+                <div className="flex flex-col gap-3">
+                  {carregandoPedidosCompra && (
+                    <div className="flex items-center justify-center py-10 gap-3">
+                      <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#c084fc', borderTopColor: 'transparent' }} />
+                      <span className="text-[11px] tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(192,132,252,0.5)' }}>
+                        {lang === 'en' ? 'Loading purchases...' : 'Carregando compras…'}
+                      </span>
+                    </div>
+                  )}
+
+                  {!carregandoPedidosCompra && pedidosCompra.length === 0 && (
+                    <div className="flex flex-col items-center py-14 gap-3">
+                      <span className="text-4xl" style={{ opacity: 0.12 }}>🛒</span>
+                      <p className="text-[11px] tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(255,255,255,0.2)' }}>
+                        {lang === 'en' ? 'No purchases yet' : 'Nenhuma compra ainda'}
+                      </p>
+                    </div>
+                  )}
+
+                  {!carregandoPedidosCompra && pedidosCompra.map((pedido) => (
+                    <div key={pedido.orderId}
+                      className="rounded-xl p-4 flex flex-col gap-3 transition-all"
+                      style={{ background: 'rgba(192,132,252,0.03)', border: '1px solid rgba(192,132,252,0.12)', backdropFilter: 'blur(10px)' }}>
+
+                      {/* Order header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-[9px] font-mono" style={{ color: 'rgba(192,132,252,0.4)' }}>ORDER #{pedido.orderId}</span>
+                            {pedido.status === 0 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#fb923c', background: 'rgba(251,146,60,0.1)', borderColor: 'rgba(251,146,60,0.3)' }}>⏳ {lang === 'en' ? 'AWAITING SHIPMENT' : 'AGUARDANDO ENVIO'}</span>}
+                            {pedido.status === 1 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#c084fc', background: 'rgba(192,132,252,0.1)', borderColor: 'rgba(192,132,252,0.3)' }}>📦 {lang === 'en' ? 'SHIPPED' : 'ENVIADO'}</span>}
+                            {pedido.status === 2 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', background: 'rgba(74,222,128,0.1)', borderColor: 'rgba(74,222,128,0.3)' }}>🎉 {lang === 'en' ? 'COMPLETE' : 'CONCLUÍDA'}</span>}
+                            {pedido.status === 3 && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full border tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }}>↩ {lang === 'en' ? 'REFUNDED' : 'REEMBOLSADO'}</span>}
+                          </div>
+                          <p className="font-bold text-sm text-white truncate" style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.03em' }}>
+                            {pedido.itemName}
+                          </p>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            <span className="text-[10px] font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                              {lang === 'en' ? 'Seller:' : 'Vendedor:'} {pedido.seller.slice(0, 8)}…{pedido.seller.slice(-6)}
+                            </span>
+                            <span className="text-[10px] font-bold" style={{ fontFamily: "'Orbitron', sans-serif", color: '#c084fc' }}>
+                              {parseFloat(pedido.amountEth).toFixed(6)} ETH
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Pending: tracking input */}
-                    {pedido.status === 0 && (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-[10px] text-yellow-400/70 tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                          ⏳ {lang === 'en' ? 'Ship the item and add the tracking code below:' : 'Envie o produto e informe o código de rastreio abaixo:'}
-                        </p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder={lang === 'en' ? 'Tracking code (ex: BR123456789)' : 'Código de rastreio (ex: BR123456789)'}
-                            value={pedidoTracking[pedido.orderId] ?? ''}
-                            onChange={(e) => setPedidoTracking((p) => ({ ...p, [pedido.orderId]: e.target.value }))}
-                            className="flex-1 px-3 py-2 rounded-lg text-xs text-white outline-none border border-white/10 focus:border-cyan-400/40 transition-all"
-                            style={{ background: 'rgba(255,255,255,0.05)', fontFamily: 'inherit' }}
-                          />
+                      {/* Pending → aguardando vendedor */}
+                      {pedido.status === 0 && (
+                        <div className="rounded-lg px-3 py-2.5 text-center"
+                          style={{ background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.2)' }}>
+                          <p className="text-[11px] tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,146,60,0.8)' }}>
+                            ⏳ {lang === 'en' ? 'Waiting for seller to ship your order' : 'Aguardando vendedor enviar o produto'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Shipped → mostrar tracking + botão de release */}
+                      {pedido.status === 1 && (
+                        <div className="flex flex-col gap-3">
+                          {/* Tracking code */}
+                          <div className="rounded-lg px-3 py-2.5 flex flex-col gap-1"
+                            style={{ background: 'rgba(192,132,252,0.07)', border: '1px solid rgba(192,132,252,0.22)' }}>
+                            <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(192,132,252,0.5)' }}>
+                              {lang === 'en' ? 'Tracking Code' : 'Código de Rastreio'}
+                            </p>
+                            <p className="text-base font-mono font-bold" style={{ color: '#c084fc', letterSpacing: '0.1em', textShadow: '0 0 10px rgba(192,132,252,0.4)' }}>
+                              {pedido.trackingCode || '—'}
+                            </p>
+                          </div>
+
+                          {/* Release funds button — pulsing neon */}
                           <button
-                            onClick={() => void handleUpdateTracking(pedido.orderId, pedidoTracking[pedido.orderId] ?? '')}
-                            disabled={pedidoTxStatus[pedido.orderId] === 'enviando' || !(pedidoTracking[pedido.orderId] ?? '').trim()}
-                            className="px-4 py-2 rounded-lg text-xs font-bold tracking-widest uppercase transition-all"
+                            onClick={() => void handleReleaseFunds(pedido.orderId)}
+                            disabled={releaseStatus[pedido.orderId] === 'liberando' || releaseStatus[pedido.orderId] === 'liberado'}
+                            className="w-full py-3.5 rounded-xl font-black tracking-widest uppercase text-sm transition-all duration-200 relative overflow-hidden"
                             style={{
                               fontFamily: "'Orbitron', sans-serif",
-                              background: (pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor + '22' : 'rgba(255,255,255,0.04)',
-                              border: `1px solid ${(pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor + '60' : 'rgba(255,255,255,0.1)'}`,
-                              color: (pedidoTracking[pedido.orderId] ?? '').trim() ? customizacao.neonColor : 'rgba(255,255,255,0.2)',
-                              cursor: (pedidoTracking[pedido.orderId] ?? '').trim() ? 'pointer' : 'not-allowed',
+                              background: releaseStatus[pedido.orderId] === 'liberando' ? 'rgba(74,222,128,0.08)' : 'rgba(74,222,128,0.14)',
+                              border: '1.5px solid rgba(74,222,128,0.55)',
+                              color: releaseStatus[pedido.orderId] === 'liberando' ? 'rgba(74,222,128,0.5)' : '#4ade80',
+                              boxShadow: releaseStatus[pedido.orderId] === 'liberando' ? 'none' : '0 0 22px rgba(74,222,128,0.28), inset 0 0 20px rgba(74,222,128,0.06)',
+                              animation: releaseStatus[pedido.orderId] === 'liberando' ? 'none' : 'neonPulse 2s ease-in-out infinite',
+                              cursor: releaseStatus[pedido.orderId] === 'liberando' ? 'wait' : 'pointer',
                             }}>
-                            {pedidoTxStatus[pedido.orderId] === 'enviando' ? '⟳' : lang === 'en' ? '📦 Ship' : '📦 Enviar'}
+                            {releaseStatus[pedido.orderId] === 'liberando' ? (
+                              <span className="flex items-center justify-center gap-2">
+                                <span className="inline-block w-4 h-4 border-2 border-t-transparent border-green-400 rounded-full animate-spin" />
+                                {lang === 'en' ? 'Releasing funds… Approve in wallet' : 'Liberando fundos… Aprove na carteira'}
+                              </span>
+                            ) : (
+                              `✅ ${lang === 'en' ? 'I RECEIVED IT — Release Payment' : 'RECEBI A ENCOMENDA — Liberar Pagamento'}`
+                            )}
                           </button>
+                          {releaseStatus[pedido.orderId] === 'erro' && (
+                            <p className="text-[11px] text-center" style={{ color: '#f87171' }}>⚠ {lang === 'en' ? 'Error. Check wallet and try again.' : 'Erro. Verifique a carteira e tente novamente.'}</p>
+                          )}
                         </div>
-                        {pedidoTxStatus[pedido.orderId] === 'enviado' && (
-                          <p className="text-green-400 text-xs">✓ {lang === 'en' ? 'Tracking code sent!' : 'Código enviado! Atualizando...'}</p>
-                        )}
-                        {pedidoTxStatus[pedido.orderId] === 'erro' && (
-                          <p className="text-red-400 text-xs">⚠ {lang === 'en' ? 'Error sending. Try again.' : 'Erro ao enviar. Tente novamente.'}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
+
+                      {/* Completed */}
+                      {pedido.status === 2 && (
+                        <div className="rounded-lg px-3 py-2.5 text-center"
+                          style={{ background: 'rgba(74,222,128,0.06)', border: '1px solid rgba(74,222,128,0.2)' }}>
+                          <p className="text-[11px] font-bold tracking-widest" style={{ fontFamily: "'Orbitron', sans-serif", color: '#4ade80', textShadow: '0 0 8px rgba(74,222,128,0.4)' }}>
+                            🎉 {lang === 'en' ? 'Purchase Completed!' : 'Compra Finalizada!'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
             </div>
           )}
 
