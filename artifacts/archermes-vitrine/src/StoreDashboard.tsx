@@ -209,17 +209,23 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     if (!enderecoUsuario) { setCarregando(false); return; }
     setCarregando(true);
     try {
+      const signal = AbortSignal.timeout(20_000);
       const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-      const [bFee, pFee, store] = await Promise.all([
-        contrato.basicStoreFee(),
-        contrato.proStoreFee(),
-        contrato.stores(enderecoUsuario),
+      const [bFee, pFee, store] = await Promise.race([
+        Promise.all([
+          contrato.basicStoreFee(),
+          contrato.proStoreFee(),
+          contrato.stores(enderecoUsuario),
+        ]),
+        new Promise<never>((_, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('RPC timeout — verifique sua conexão.')))
+        ),
       ]);
       setBasicFee(formatUnits(bFee, 18));
       setProFee(formatUnits(pFee, 18));
       setLoja({ storeName: store.storeName, expiresAt: store.expiresAt, tier: Number(store.tier), productCount: store.productCount });
-    } catch (err) { console.error(err); } finally { setCarregando(false); }
+    } catch (err) { console.error('[checarLoja]', err); } finally { setCarregando(false); }
   }, [enderecoUsuario]);
 
   useEffect(() => { void checarLoja(); }, [checarLoja]);
@@ -500,7 +506,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             {t('dash.storeCreated')}
           </h2>
           <p className="text-white/60 text-sm">{t('dash.storeActive')}</p>
-          <button onClick={() => { setEstado('idle'); setCarregando(true); }}
+          <button onClick={() => { setEstado('idle'); void checarLoja(); }}
             className="btn-neon btn-neon-cyan">
             {t('dash.viewMyStore')}
           </button>

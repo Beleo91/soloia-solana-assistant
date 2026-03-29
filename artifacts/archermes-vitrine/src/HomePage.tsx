@@ -12,7 +12,7 @@ import {
 import StoreDashboard from './StoreDashboard';
 import AffiliateDashboard from './AffiliateDashboard';
 import StoreView, { type StoreItem } from './StoreView';
-import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
+import { getStoreRegistry, getBoostedProducts, getNeonShadow, saveStoreToRegistry, fetchRegistryFromServer, mergeServerRegistry, LS_STORE_REGISTRY, type RegistryStore, type BoostedProduct as BoostedProductEntry } from './registry';
 import { extractContractError } from './contractUtils';
 import { uploadImages, resolveImgUrl, saveImageMap, syncImageMapToStorage } from './imageUploader';
 import { useVitrineSync, broadcastVitrineEvent } from './vitrineSync';
@@ -321,10 +321,19 @@ export default function HomePage() {
   }
 
   useEffect(() => {
+    // 1. Load immediately from localStorage (fast)
     carregarDadosLocais();
+    // 2. Fetch from server and merge (so cross-browser customizations appear)
+    fetchRegistryFromServer().then((serverEntries) => {
+      if (serverEntries.length > 0) {
+        mergeServerRegistry(serverEntries);
+        setLojasReais(getStoreRegistry());
+      }
+    }).catch(() => { /* ignore */ });
     const onFocus = () => carregarDadosLocais();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Quando o usuário conecta, carrega a loja dele na blockchain e registra
@@ -550,10 +559,21 @@ export default function HomePage() {
             proSet.add(addr.toLowerCase());
             vipList.push({ address: addr, storeName: st.storeName, productCount: Number(st.productCount), tier });
           }
-          let customizacao = { avatarUrl: '', bannerUrl: '', neonColor: '#00e5ff' };
+          // Priority: local owner key → server registry (already merged) → defaults
+          const serverReg = getStoreRegistry();
+          const serverEntry = serverReg.find((s) => s.address.toLowerCase() === addr);
+          let customizacao = {
+            avatarUrl: serverEntry?.avatarUrl ?? '',
+            bannerUrl: serverEntry?.bannerUrl ?? '',
+            neonColor: serverEntry?.neonColor ?? '#00e5ff',
+          };
           try {
             const raw = localStorage.getItem(`archermes_customizacao_${addr}`);
-            if (raw) customizacao = JSON.parse(raw) as typeof customizacao;
+            if (raw) {
+              const local = JSON.parse(raw) as typeof customizacao;
+              // Local owner key takes precedence when it has actual content
+              if (local.avatarUrl || local.bannerUrl) customizacao = local;
+            }
           } catch { /* ignore */ }
           const entry: RegistryStore = {
             address: addr,
@@ -565,7 +585,20 @@ export default function HomePage() {
             productCount: Number(st.productCount),
           };
           registryEntries.push(entry);
-          saveStoreToRegistry(entry);
+          // Only sync to server when we have actual customization to avoid overwriting with empty data
+          if (customizacao.avatarUrl || customizacao.bannerUrl || customizacao.neonColor !== '#00e5ff') {
+            saveStoreToRegistry(entry);
+          } else {
+            // Still update locally but don't POST empty data to server
+            const localReg = getStoreRegistry();
+            const li = localReg.findIndex((s) => s.address.toLowerCase() === addr);
+            if (li >= 0) {
+              localReg[li] = { ...localReg[li], storeName: st.storeName, tier, productCount: Number(st.productCount) };
+            } else {
+              localReg.unshift(entry);
+            }
+            try { localStorage.setItem(LS_STORE_REGISTRY, JSON.stringify(localReg)); } catch { /* ignore */ }
+          }
         });
         setSellersPro(proSet);
         setLojasVip(vipList);
@@ -1070,7 +1103,6 @@ export default function HomePage() {
               {t('nav.affiliate')}
             </button>
             <button onClick={() => setPagina('minha-loja')} className="btn-entrar">{t('nav.myStoreIcon')}</button>
-            <button onClick={abrirModal} className="btn-anunciar">{t('nav.list')}</button>
             <button onClick={disconnect} className="btn-sair">{t('nav.disconnect')}</button>
           </div>
         )}

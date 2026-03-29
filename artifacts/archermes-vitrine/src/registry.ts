@@ -38,6 +38,13 @@ export function getNeonShadow(color: string): string {
   return NEON_SHADOW[color] ?? 'rgba(0,229,255,0.4)';
 }
 
+function getApiBase(): string {
+  if (typeof window !== 'undefined') return `${window.location.origin}/api`;
+  return '';
+}
+
+// ── Local registry (localStorage) ────────────────────────────────────────────
+
 export function getStoreRegistry(): RegistryStore[] {
   try {
     const raw = localStorage.getItem(LS_STORE_REGISTRY);
@@ -46,6 +53,42 @@ export function getStoreRegistry(): RegistryStore[] {
   return [];
 }
 
+function setStoreRegistryLocal(registry: RegistryStore[]): void {
+  try {
+    localStorage.setItem(LS_STORE_REGISTRY, JSON.stringify(registry));
+  } catch { /* ignore */ }
+}
+
+/** Merge server entries into local registry (server wins on conflicts). */
+export function mergeServerRegistry(serverEntries: RegistryStore[]): void {
+  if (!serverEntries.length) return;
+  const local = getStoreRegistry();
+  const merged = [...local];
+  for (const serverEntry of serverEntries) {
+    const idx = merged.findIndex(
+      (s) => s.address.toLowerCase() === serverEntry.address.toLowerCase()
+    );
+    if (idx >= 0) {
+      merged[idx] = serverEntry;
+    } else {
+      merged.push(serverEntry);
+    }
+  }
+  setStoreRegistryLocal(merged);
+}
+
+/** Fetch all store registry entries from the API server. */
+export async function fetchRegistryFromServer(): Promise<RegistryStore[]> {
+  try {
+    const api = getApiBase();
+    if (!api) return [];
+    const res = await fetch(`${api}/store-registry`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return [];
+    return (await res.json()) as RegistryStore[];
+  } catch { return []; }
+}
+
+/** Save one store to localStorage AND push to the API server (fire-and-forget). */
 export function saveStoreToRegistry(store: RegistryStore): void {
   try {
     const registry = getStoreRegistry();
@@ -57,9 +100,21 @@ export function saveStoreToRegistry(store: RegistryStore): void {
     } else {
       registry.unshift(store);
     }
-    localStorage.setItem(LS_STORE_REGISTRY, JSON.stringify(registry));
+    setStoreRegistryLocal(registry);
   } catch { /* ignore */ }
+
+  // Fire-and-forget: persist to the API server so other browsers can see it
+  const api = getApiBase();
+  if (api) {
+    fetch(`${api}/store-registry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(store),
+    }).catch(() => { /* ignore network errors */ });
+  }
 }
+
+// ── Boosted products ──────────────────────────────────────────────────────────
 
 export function getBoostedProducts(): BoostedProduct[] {
   try {
@@ -83,6 +138,8 @@ export function addBoostedProduct(prod: BoostedProduct): void {
     localStorage.setItem(LS_BOOSTED_PRODUCTS, JSON.stringify(filtered));
   } catch { /* ignore */ }
 }
+
+// ── Item images ───────────────────────────────────────────────────────────────
 
 export function getItemImages(id: number): string[] {
   try {
