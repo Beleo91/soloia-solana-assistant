@@ -825,7 +825,7 @@ export default function HomePage() {
     const provider = getProvider();
     if (!provider) { setEstado('sem-carteira'); return; }
 
-    const precoWei = parseUnits(precoStr, 18);
+    const precoWei = parseUnits(precoStr.replace(',', '.'), 18);
     const estoque  = BigInt(Math.max(1, formEstoque));
 
     try {
@@ -842,12 +842,12 @@ export default function HomePage() {
         const rpc = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
         const iface = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, rpc);
         const data = iface.interface.encodeFunctionData('listItem', [
-          nomeItem, precoWei, form.categoria, estoque,
+          nomeItem, precoWei, form.categoria,
         ]);
 
         console.log('[ARCHERMES] GOD MODE listItem (raw tx):', {
           from: walletAddress, to: CONTRACT_ADDRESS, nomeItem,
-          preco: precoStr, categoria: form.categoria, estoque: estoque.toString(), gas: '0x7A120',
+          preco: precoStr, categoria: form.categoria, gas: '0x7A120',
         });
 
         const txHash = await eth.request({
@@ -896,8 +896,8 @@ export default function HomePage() {
         // ── Normal user flow ─────────────────────────────────────────────────
         const signer = await provider.getSigner();
         const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        console.log('[ARCHERMES] listItem (user):', { nomeItem, precoStr, categoria: form.categoria, estoque: estoque.toString() });
-        const tx = await contrato.listItem(nomeItem, precoWei, form.categoria, estoque);
+        console.log('[ARCHERMES] listItem (user):', { nomeItem, precoStr, categoria: form.categoria });
+        const tx = await contrato.listItem(nomeItem, precoWei, form.categoria);
         await tx.wait();
         finalTxHash = tx.hash;
 
@@ -951,11 +951,6 @@ export default function HomePage() {
   async function confirmarCompra() {
     if (!itemParaComprar) return;
     if (!isConnected) { setBuyEstado('erro'); setBuyErro('Conecte uma carteira para comprar.'); return; }
-    if (!enderecoEntrega.trim()) {
-      setBuyErro(lang === 'en' ? 'Please enter your delivery address.' : 'Informe o endereço de entrega.');
-      setBuyEstado('erro');
-      return;
-    }
     setBuyEstado('confirmando');
     const currency = itemParaComprar.currency ?? 'ETH';
     try {
@@ -971,8 +966,8 @@ export default function HomePage() {
         const priceWei    = parseUnits(itemParaComprar.priceEth, 18);
         const shippingWei = parseUnits(SHIPPING_FEE_ETH, 18);
         const totalWei    = priceWei + shippingWei;
-        // v7: buyItem(id, referrer, deliveryAddress) — shipping included in value
-        const tx = await contrato.buyItem(itemParaComprar.id, referrer, enderecoEntrega.trim(), { value: totalWei });
+        // v10: buyItem(id, referrer) — shipping included in value
+        const tx = await contrato.buyItem(itemParaComprar.id, referrer, { value: totalWei });
         await tx.wait();
         setBuyTx(tx.hash);
       } else {
@@ -2049,19 +2044,7 @@ export default function HomePage() {
                       {CATEGORIAS.map((c) => <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>)}
                     </select>
                   </div>
-                  {/* Estoque */}
-                  <div className="campo">
-                    <label>{lang === 'en' ? 'Stock Quantity' : 'Quantidade em Estoque'} *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      required
-                      value={formEstoque}
-                      onChange={(e) => setFormEstoque(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      placeholder={lang === 'en' ? 'How many units do you have?' : 'Quantas unidades você tem?'}
-                    />
-                  </div>
+
                   {/* Upload de imagens */}
                   <div className="campo">
                     <label>{t('modal.list.images')}</label>
@@ -2199,25 +2182,7 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* ── Endereço de entrega (obrigatório) ── */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-white/50 tracking-widest uppercase"
-                      style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                      {lang === 'en' ? '📦 Delivery Address' : '📦 Endereço de Entrega'}
-                      <span className="text-red-400 ml-1">*</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={enderecoEntrega}
-                      onChange={(e) => setEnderecoEntrega(e.target.value)}
-                      placeholder={lang === 'en'
-                        ? 'Street, number, city, state, ZIP…'
-                        : 'Rua, número, bairro, cidade, estado, CEP…'}
-                      disabled={buyEstado === 'confirmando'}
-                      className="w-full rounded-xl border border-white/15 bg-white/5 text-white text-sm p-3 resize-none outline-none focus:border-cyan-400/50 placeholder:text-white/25 transition-colors"
-                      style={{ fontFamily: 'inherit' }}
-                    />
-                  </div>
+
 
                   {/* ── Resumo de preços ── */}
                   {(() => {

@@ -22,7 +22,6 @@ export const CONTRACT_ABI = [
       { internalType: 'string',  name: '_itemName', type: 'string' },
       { internalType: 'uint256', name: '_price',    type: 'uint256' },
       { internalType: 'string',  name: '_category', type: 'string' },
-      { internalType: 'uint256', name: '_stock',    type: 'uint256' },
     ],
     name: 'listItem', outputs: [], stateMutability: 'nonpayable', type: 'function',
   },
@@ -34,7 +33,6 @@ export const CONTRACT_ABI = [
     inputs: [
       { internalType: 'uint256',         name: '_id',              type: 'uint256' },
       { internalType: 'address payable', name: '_referrer',        type: 'address' },
-      { internalType: 'string',          name: '_deliveryAddress', type: 'string'  },
     ],
     name: 'buyItem', outputs: [], stateMutability: 'payable', type: 'function',
   },
