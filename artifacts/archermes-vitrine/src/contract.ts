@@ -1,7 +1,7 @@
 // v7 — deployed 2026-03-29 — tx 0xe81853dddf8f97353544362c2746cde9e836a4a7ca7e672b40e91bb3d5a8cef6
 // GOD_MODE_ADMIN hardcoded in contract: 0x434189487484F20B9Bf0e0c28C1559B0c961274B
 // v7 changes: deliveryAddress in Order, shippingFee (0.001 ETH), buyItem gains _deliveryAddress param
-export const CONTRACT_ADDRESS = '0x7A556059337e038486267E6fb2aF2c09F70410Cd';
+export const CONTRACT_ADDRESS = '0x1c3517d9920d16b2e465c0B19Ec412F5aF';
 
 export const CONTRACT_ABI = [
   // ── Admin ────────────────────────────────────────────────────────────────
