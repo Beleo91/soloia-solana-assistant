@@ -147,12 +147,28 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const enderecoUsuario = walletAddress ?? '';
   const isAdmin = enderecoUsuario.toLowerCase() === TREASURY_WALLET.toLowerCase();
 
-  // Carregar customização do localStorage
+  // Carregar customização do banco (se existir) ou do localStorage
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`${LS_KEY}_${enderecoUsuario}`);
-      if (saved) setCustomizacao(JSON.parse(saved));
-    } catch { /* ignore */ }
+    if (!enderecoUsuario) return;
+    
+    // Tenta carregar do backend global primeiro
+    import('./registry').then(({ getStoreRegistry }) => {
+      const stores = getStoreRegistry();
+      const minhaLoja = stores.find(s => s.address.toLowerCase() === enderecoUsuario.toLowerCase());
+      if (minhaLoja) {
+        setCustomizacao({
+          avatarUrl: minhaLoja.avatarUrl,
+          bannerUrl: minhaLoja.bannerUrl,
+          neonColor: minhaLoja.neonColor || '#00e5ff',
+        });
+      } else {
+        // Fallback local
+        try {
+          const saved = localStorage.getItem(`${LS_KEY}_${enderecoUsuario}`);
+          if (saved) setCustomizacao(JSON.parse(saved));
+        } catch { /* ignore */ }
+      }
+    });
   }, [enderecoUsuario]);
 
   // Carregar IDs excluídos do localStorage
