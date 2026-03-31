@@ -996,27 +996,37 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   </div>
                 </div>
 
-                {/* Ações */}
+                {/* Botão grande Anunciar Produto — logo após as stats */}
+                {onAnunciar && (
+                  <button
+                    onClick={onAnunciar}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
+                      width: '100%',
+                      padding: '1rem 1.5rem',
+                      borderRadius: '14px',
+                      border: `2px solid ${customizacao.neonColor}`,
+                      background: `linear-gradient(135deg, ${customizacao.neonColor}25, ${customizacao.neonColor}08)`,
+                      color: customizacao.neonColor,
+                      fontFamily: "'Orbitron', sans-serif",
+                      fontSize: '0.85rem',
+                      fontWeight: 900,
+                      letterSpacing: '0.15em',
+                      cursor: 'pointer',
+                      boxShadow: `0 0 28px ${customizacao.neonColor}35, inset 0 0 20px ${customizacao.neonColor}08`,
+                      transition: 'all 0.2s ease',
+                      textTransform: 'uppercase',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 40px ${customizacao.neonColor}60, inset 0 0 25px ${customizacao.neonColor}15`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = `0 0 28px ${customizacao.neonColor}35, inset 0 0 20px ${customizacao.neonColor}08`; e.currentTarget.style.transform = 'translateY(0)'; }}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>⚡</span>
+                    {lang === 'en' ? '+ LIST PRODUCT' : '+ ANUNCIAR PRODUTO'}
+                  </button>
+                )}
+
+                {/* Ações secundárias */}
                 <div className="flex flex-col gap-3">
-                  {/* Botão principal: Anunciar Produto */}
-                  {onAnunciar && (
-                    <button onClick={onAnunciar}
-                      className="btn-neon btn-neon-full btn-neon-lg"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,229,255,0.05))',
-                        border: '1.5px solid rgba(0,229,255,0.5)',
-                        color: '#00e5ff',
-                        fontFamily: "'Orbitron', sans-serif",
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.1em',
-                        boxShadow: '0 0 18px rgba(0,229,255,0.15)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                      }}>
-                      <span style={{ fontSize: '1rem' }}>⚡</span>
-                      {lang === 'en' ? '+ List Product' : '+ Anunciar Produto'}
-                    </button>
-                  )}
 
                   {loja!.tier < 1 && upgradeEstado !== 'sucesso' && (
                     <button onClick={handleUpgradePro}
@@ -1062,27 +1072,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {onAnunciar && (
-                    <button onClick={onAnunciar}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        padding: '0.45rem 1rem',
-                        borderRadius: '999px',
-                        border: `1.5px solid ${customizacao.neonColor}80`,
-                        background: `linear-gradient(135deg, ${customizacao.neonColor}18, ${customizacao.neonColor}06)`,
-                        color: customizacao.neonColor,
-                        fontFamily: "'Orbitron', sans-serif",
-                        fontSize: '0.65rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.1em',
-                        cursor: 'pointer',
-                        boxShadow: `0 0 14px ${customizacao.neonColor}25`,
-                        transition: 'all 0.2s ease',
-                      }}>
-                      <span style={{ fontSize: '0.85rem' }}>⚡</span>
-                      {lang === 'en' ? '+ LIST' : '+ ANUNCIAR'}
-                    </button>
-                  )}
                   <button onClick={carregarMeusProdutos}
                     className="text-xs text-white/30 hover:text-cyan-400 transition-colors tracking-widest uppercase"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>
@@ -1104,28 +1093,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                   <span className="text-5xl opacity-15">⬡</span>
                   <p className="text-white/30 text-xs tracking-widest uppercase"
                     style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.noProducts')}</p>
-                  {onAnunciar && (
-                    <button onClick={onAnunciar}
-                      style={{
-                        marginTop: '0.5rem',
-                        display: 'flex', alignItems: 'center', gap: '0.5rem',
-                        padding: '0.65rem 1.6rem',
-                        borderRadius: '999px',
-                        border: `1.5px solid ${customizacao.neonColor}80`,
-                        background: `linear-gradient(135deg, ${customizacao.neonColor}18, ${customizacao.neonColor}08)`,
-                        color: customizacao.neonColor,
-                        fontFamily: "'Orbitron', sans-serif",
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.12em',
-                        cursor: 'pointer',
-                        boxShadow: `0 0 20px ${customizacao.neonColor}20`,
-                        transition: 'all 0.2s ease',
-                      }}>
-                      <span style={{ fontSize: '1rem' }}>⚡</span>
-                      {lang === 'en' ? 'CREATE FIRST LISTING' : 'CRIAR PRIMEIRO ANÚNCIO'}
-                    </button>
-                  )}
                 </div>
               )}
 

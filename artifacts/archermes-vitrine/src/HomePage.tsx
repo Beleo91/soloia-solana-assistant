@@ -27,7 +27,7 @@ const PLATFORM_FEE_PERCENT = 3n;
 /** Must stay in sync with on-chain referralFeePercent — v3 contract uses 2. */
 const REFERRAL_FEE_PERCENT = 2n;
 
-const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
+const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'NFT', 'Criança', 'Outros'];
 
 type Moeda = 'ETH' | StablecoinSymbol;
 
@@ -762,6 +762,7 @@ export default function HomePage() {
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
     setFormImages([]); setFormImagesBase64([]);
     setFormEstoque(1);
+    setFormEstoque(1);
     setModalAberto(true);
   }
   function fecharModal() { setModalAberto(false); setEstado('idle'); setFormImages([]); setFormImagesBase64([]); setFormEstoque(1); setPostListReloading(false); }
@@ -885,7 +886,7 @@ export default function HomePage() {
           const hostedUrls = formImagesBase64.filter((u) => u.startsWith('https://'));
           if (hostedUrls.length > 0) {
             localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(hostedUrls));
-            void saveImageMap(newId, hostedUrls);
+            void saveImageMap(newId, hostedUrls, formEstoque);
           }
         } catch { /* ignore image persistence errors */ }
 
@@ -907,7 +908,7 @@ export default function HomePage() {
             const hostedUrls = formImagesBase64.filter((u) => u.startsWith('https://'));
             if (hostedUrls.length > 0) {
               localStorage.setItem(`archermes_item_images_${newId}`, JSON.stringify(hostedUrls));
-              void saveImageMap(newId, hostedUrls);
+              void saveImageMap(newId, hostedUrls, formEstoque);
             }
           } catch { /* ignore */ }
         }
@@ -2042,7 +2043,18 @@ export default function HomePage() {
                     </select>
                   </div>
 
-                  {/* Upload de imagens */}
+                  {/* Estoque (off-chain) */}
+                  <div className="campo">
+                    <label>{lang === 'en' ? 'Stock Quantity' : 'Quantidade em Estoque'}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={formEstoque}
+                      onChange={(e) => setFormEstoque(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      placeholder={lang === 'en' ? 'Quantity available' : 'Qtd. disponível'}
+                    />
+                  </div>
                   <div className="campo">
                     <label>{t('modal.list.images')}</label>
                     <input

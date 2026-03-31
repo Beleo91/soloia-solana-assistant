@@ -166,17 +166,17 @@ export function resolveImgUrl(url: string): string {
   return '';
 }
 
-/** Push item→urls mapping to the API server (best-effort, non-blocking). */
-export async function saveImageMap(itemId: number, urls: string[]): Promise<void> {
+/** Push item→urls mapping (and optional stock) to the API server (best-effort, non-blocking). */
+export async function saveImageMap(itemId: number, urls: string[], stock?: number): Promise<void> {
   const hostedUrls = urls.filter(isHostedUrl);
-  if (hostedUrls.length === 0) return;
+  if (hostedUrls.length === 0 && stock === undefined) return;
   const apiUrl = getApiUrl();
   if (!apiUrl) return;
   try {
     await fetch(`${apiUrl}/images/map`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId, urls: hostedUrls }),
+      body: JSON.stringify({ itemId, urls: hostedUrls, ...(stock !== undefined ? { stock } : {}) }),
     });
   } catch (err) {
     // Non-fatal: the API server may not be available in production (Vercel).
