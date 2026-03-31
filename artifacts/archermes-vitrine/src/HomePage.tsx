@@ -790,10 +790,7 @@ export default function HomePage() {
       setErroMsg('Preço inválido. Use um número maior que zero (ex: 0.05).');
       setEstado('erro'); return;
     }
-    if (formEstoque < 1) {
-      setErroMsg('Quantidade em estoque deve ser pelo menos 1.');
-      setEstado('erro'); return;
-    }
+
 
     // Admin wallet bypasses all tier/product-count restrictions
     const ADMIN_ADDR = '0x434189487484F20B9Bf0e0c28C1559B0c961274B';
@@ -826,7 +823,7 @@ export default function HomePage() {
     if (!provider) { setEstado('sem-carteira'); return; }
 
     const precoWei = parseUnits(precoStr.replace(',', '.'), 18);
-    const estoque  = BigInt(Math.max(1, formEstoque));
+
 
     try {
       let finalTxHash = '';
