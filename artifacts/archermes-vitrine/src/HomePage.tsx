@@ -528,13 +528,12 @@ export default function HomePage() {
           } catch { /* ignore */ }
           return {
             id,
-            itemName: it.itemName,
+            itemName: ((it as unknown as Record<string, unknown>).name ?? (it as unknown as Record<string, unknown>).itemName ?? '') as string,
             priceEth: formatUnits(it.price, 18),
-            category: it.category,
-            seller: it.seller,
+            category: it.category as string,
+            seller: it.seller as string,
             images,
             currency: MOCK_ITEM_CURRENCY[id] ?? 'ETH',
-            stock: it.stock,
           };
         });
 
@@ -713,7 +712,7 @@ export default function HomePage() {
           return {
             orderId: Number(o.orderId),
             itemId:  Number(o.itemId),
-            itemName: it.itemName as string,
+            itemName: (((it as unknown as Record<string, unknown>).name ?? (it as unknown as Record<string, unknown>).itemName) as string) || '',
             amountEth: formatUnits(o.amount as bigint, 18),
             seller: o.seller as string,
             status: Number(o.status),

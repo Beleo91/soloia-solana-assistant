@@ -48,7 +48,6 @@ interface PedidoCompra {
   amountEth: string;
   status: number;
   trackingCode: string;
-  deliveryAddress: string;
 }
 
 interface Customizacao {
@@ -337,7 +336,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
           const isBoosted = boostedList.some((b) => b.id === Number(item.id));
           lista.push({
             id: Number(item.id),
-            itemName: item.itemName as string,
+            itemName: (((item as unknown as Record<string, unknown>).name ?? (item as unknown as Record<string, unknown>).itemName) as string) || '',
             priceEth: formatUnits(item.price as bigint, 18),
             category: item.category as string,
             isActive: item.isActive as boolean,
@@ -373,7 +372,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
           lista.push({
             orderId: Number(o.orderId),
             itemId: Number(o.itemId),
-            itemName: it.itemName as string,
+            itemName: (((it as unknown as Record<string, unknown>).name ?? (it as unknown as Record<string, unknown>).itemName) as string) || '',
             buyer: o.buyer as string,
             amountEth: formatUnits(o.amount as bigint, 18),
             status: Number(o.status),
@@ -412,12 +411,11 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
           lista.push({
             orderId: Number(o.orderId),
             itemId: Number(o.itemId),
-            itemName: it.itemName as string,
+            itemName: (((it as unknown as Record<string, unknown>).name ?? (it as unknown as Record<string, unknown>).itemName) as string) || '',
             seller: o.seller as string,
             amountEth: formatUnits(o.amount as bigint, 18),
             status: Number(o.status),
             trackingCode: o.trackingCode as string,
-            deliveryAddress: (o.deliveryAddress as string) || '',
           });
         } catch { /* skip */ }
       }));
