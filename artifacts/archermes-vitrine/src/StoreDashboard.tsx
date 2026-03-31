@@ -26,7 +26,6 @@ interface MeuProduto {
   priceEth: string;
   category: string;
   isActive: boolean;
-  stock: bigint;
   imageUrl?: string;
   isBoosted?: boolean;
 }
@@ -39,7 +38,6 @@ interface PedidoSeller {
   amountEth: string;
   status: number; // 0=Pending 1=Shipped 2=Completed 3=Refunded
   trackingCode: string;
-  deliveryAddress: string;
 }
 
 interface PedidoCompra {
@@ -325,28 +323,34 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
       const provider = new JsonRpcProvider(arcTestnet.rpcUrls.default.http[0]);
       const contrato = new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
       const total: bigint = await contrato.totalItems();
+      const totalNum = Number(total);
+      console.log('[carregarMeusProdutos] totalItems:', totalNum, 'seller:', enderecoUsuario);
       const lista: MeuProduto[] = [];
-      for (let i = 1; i <= Number(total); i++) {
-        const item = await contrato.items(i);
-        if (item.seller.toLowerCase() === enderecoUsuario.toLowerCase()) {
+      for (let i = 1; i <= totalNum; i++) {
+        try {
+          const item = await contrato.items(i);
+          const seller = (item.seller as string).toLowerCase();
+          if (seller !== enderecoUsuario.toLowerCase()) continue;
           const imgs = getItemImages(Number(item.id));
-          const boostedRaw = localStorage.getItem(`archermes_boosted_products`);
+          const boostedRaw = localStorage.getItem('archermes_boosted_products');
           const boostedList = boostedRaw ? (JSON.parse(boostedRaw) as Array<{ id: number }>) : [];
           const isBoosted = boostedList.some((b) => b.id === Number(item.id));
           lista.push({
             id: Number(item.id),
-            itemName: item.itemName,
-            priceEth: formatUnits(item.price, 18),
-            category: item.category,
-            isActive: item.isActive,
-            stock: BigInt(item.stock ?? 0),
+            itemName: item.itemName as string,
+            priceEth: formatUnits(item.price as bigint, 18),
+            category: item.category as string,
+            isActive: item.isActive as boolean,
             imageUrl: imgs[0],
             isBoosted,
           });
+        } catch (itemErr) {
+          console.warn(`[carregarMeusProdutos] erro ao ler item ${i}:`, itemErr);
         }
       }
+      console.log('[carregarMeusProdutos] encontrados:', lista.length);
       setMeusProdutos(lista.filter((p) => !deletedIds.has(p.id)));
-    } catch (err) { console.error(err); } finally { setCarregandoProdutos(false); }
+    } catch (err) { console.error('[carregarMeusProdutos]', err); } finally { setCarregandoProdutos(false); }
   };
 
   useEffect(() => {
@@ -374,7 +378,6 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
             amountEth: formatUnits(o.amount as bigint, 18),
             status: Number(o.status),
             trackingCode: o.trackingCode as string,
-            deliveryAddress: (o.deliveryAddress as string) || '',
           });
         } catch { /* skip bad order */ }
       }));
@@ -1111,12 +1114,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                           <span className="text-[9px] font-bold tracking-widest bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 px-1.5 py-0.5 rounded-full"
                             style={{ fontFamily: "'Orbitron', sans-serif" }}>{t('dash.active')}</span>
                         )}
-                        {prod.stock !== undefined && prod.isActive && (
-                          <span className="text-[9px] font-bold tracking-widest bg-white/5 border border-white/10 text-white/40 px-1.5 py-0.5 rounded-full"
-                            style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                            {lang === 'en' ? 'STOCK' : 'ESTOQUE'}: {prod.stock.toString()}
-                          </span>
-                        )}
+
                       </div>
                       <h4 className="font-bold text-sm text-white leading-tight"
                         style={{ fontFamily: "'Orbitron', sans-serif", letterSpacing: '0.04em' }}>
@@ -1283,19 +1281,7 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                       {/* Pending → endereço de entrega + input de rastreio */}
                       {pedido.status === 0 && (
                         <div className="flex flex-col gap-2.5">
-                          {/* ── Delivery address ── */}
-                          {pedido.deliveryAddress ? (
-                            <div className="rounded-lg px-3 py-2.5 flex flex-col gap-1"
-                              style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)' }}>
-                              <p className="text-[9px] tracking-widest uppercase font-bold flex items-center gap-1"
-                                style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,191,36,0.8)' }}>
-                                📦 {lang === 'en' ? 'Delivery Address' : 'Endereço de Entrega'}
-                              </p>
-                              <p className="text-xs text-white/70 leading-relaxed" style={{ wordBreak: 'break-word' }}>
-                                {pedido.deliveryAddress}
-                              </p>
-                            </div>
-                          ) : null}
+
                           <p className="text-[10px] tracking-wide" style={{ fontFamily: "'Orbitron', sans-serif", color: 'rgba(251,191,36,0.7)' }}>
                             ⏳ {lang === 'en' ? 'Ship the order and add the tracking code:' : 'Envie o produto e informe o código de rastreio:'}
                           </p>
