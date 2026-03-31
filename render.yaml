@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: "Archer-Mes-API"
+    env: node
+    buildCommand: "pnpm install && pnpm run build"
+    startCommand: "cd artifacts/api-server && pnpm run start"
+    envVars:
+      - key: "NODE_VERSION"
+        value: "20.10.0" # Optional fixed version to ensure compatibility
+      - key: "PNPM_VERSION"
+        value: "8.15.5" # Optional fixed pnpm version
+      - key: "DATABASE_URL"
+        sync: false # Must be set manually in the Render Dashboard
