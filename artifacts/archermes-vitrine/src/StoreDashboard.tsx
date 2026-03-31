@@ -209,7 +209,11 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
         body: JSON.stringify(nextParam),
       });
       
-      if (!res.ok) throw new Error("Falha no servidor ao persistir os dados");
+      if (!res.ok) {
+        let backendErr = 'Falha no servidor ao persistir os dados';
+        try { const j = await res.json(); if (j.error) backendErr = j.error; } catch { /* ignore */ }
+        throw new Error(backendErr);
+      }
       
       // Sync e Refresh
       const data = await fetchRegistryFromServer();

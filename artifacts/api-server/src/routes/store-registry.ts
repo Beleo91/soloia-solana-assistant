@@ -51,8 +51,9 @@ router.post('/store-registry', async (req: Request, res: Response) => {
     }
     res.json({ ok: true });
   } catch (error) {
-    console.error('Error writing store registry to DB:', error);
-    res.status(500).json({ error: 'Database error' });
+    console.error('[(API Backend) store-registry] FALHA FATAL Drizzle/Postgres:', error);
+    const errorStr = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ error: `[PostgreSQL] ${errorStr}` });
   }
 });
 
