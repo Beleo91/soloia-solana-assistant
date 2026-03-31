@@ -61,9 +61,15 @@ interface Customizacao {
 
 const NEON_OPTIONS = [
   { label: 'Ciano', value: '#00e5ff', shadow: 'rgba(0,229,255,0.4)' },
-  { label: 'Roxo', value: '#c084fc', shadow: 'rgba(192,132,252,0.4)' },
-  { label: 'Verde', value: '#4ade80', shadow: 'rgba(74,222,128,0.4)' },
-  { label: 'Laranja', value: '#fb923c', shadow: 'rgba(251,146,60,0.4)' },
+  { label: 'Roxo Cyber', value: '#c084fc', shadow: 'rgba(192,132,252,0.4)' },
+  { label: 'Verde Matrix', value: '#4ade80', shadow: 'rgba(74,222,128,0.4)' },
+  { label: 'Laranja Blaze', value: '#fb923c', shadow: 'rgba(251,146,60,0.4)' },
+  { label: 'Rosa Choque', value: '#ff007f', shadow: 'rgba(255,0,127,0.4)' },
+  { label: 'Vermelho Laser', value: '#ff3333', shadow: 'rgba(255,51,51,0.4)' },
+  { label: 'Azul Elétrico', value: '#3b82f6', shadow: 'rgba(59,130,246,0.4)' },
+  { label: 'Amarelo Tóxico', value: '#eab308', shadow: 'rgba(234,179,8,0.4)' },
+  { label: 'Magenta Synth', value: '#d946ef', shadow: 'rgba(217,70,239,0.4)' },
+  { label: 'Lima Ácida', value: '#a3e635', shadow: 'rgba(163,230,53,0.4)' },
 ];
 
 const LS_KEY = 'archermes_customizacao';

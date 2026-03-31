@@ -32,6 +32,12 @@ const NEON_SHADOW: Record<string, string> = {
   '#c084fc': 'rgba(192,132,252,0.4)',
   '#4ade80': 'rgba(74,222,128,0.4)',
   '#fb923c': 'rgba(251,146,60,0.4)',
+  '#ff007f': 'rgba(255,0,127,0.4)',
+  '#ff3333': 'rgba(255,51,51,0.4)',
+  '#3b82f6': 'rgba(59,130,246,0.4)',
+  '#eab308': 'rgba(234,179,8,0.4)',
+  '#d946ef': 'rgba(217,70,239,0.4)',
+  '#a3e635': 'rgba(163,230,53,0.4)',
 };
 
 export function getNeonShadow(color: string): string {

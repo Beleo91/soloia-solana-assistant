@@ -1,9 +1,8 @@
-import { Router } from 'express';
-import { join } from 'path';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { Router, type Request, type Response } from 'express';
+import { db, storeRegistry } from '@workspace/db';
+import { eq } from 'drizzle-orm';
 
 const router = Router();
-const REGISTRY_FILE = join(process.cwd(), 'uploads', 'store-registry.json');
 
 interface RegistryStore {
   address: string;
@@ -15,42 +14,46 @@ interface RegistryStore {
   productCount: number;
 }
 
-function readRegistry(): RegistryStore[] {
+// GET /api/store-registry — return all registered stores
+router.get('/store-registry', async (_req: Request, res: Response) => {
   try {
-    if (existsSync(REGISTRY_FILE)) {
-      return JSON.parse(readFileSync(REGISTRY_FILE, 'utf-8')) as RegistryStore[];
-    }
-  } catch { /* ignore */ }
-  return [];
-}
-
-function writeRegistry(data: RegistryStore[]): void {
-  try {
-    writeFileSync(REGISTRY_FILE, JSON.stringify(data), 'utf-8');
-  } catch { /* ignore */ }
-}
-
-router.get('/store-registry', (_req, res) => {
-  res.json(readRegistry());
+    const stores = await db.select().from(storeRegistry);
+    res.json(stores);
+  } catch (error) {
+    console.error('Error reading store registry from DB:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
-router.post('/store-registry', (req, res) => {
+// POST /api/store-registry — create or update a store
+router.post('/store-registry', async (req: Request, res: Response) => {
   const store = req.body as RegistryStore;
   if (!store?.address) {
     res.status(400).json({ error: 'Missing address' });
     return;
   }
-  const registry = readRegistry();
-  const idx = registry.findIndex(
-    (s) => s.address.toLowerCase() === store.address.toLowerCase()
-  );
-  if (idx >= 0) {
-    registry[idx] = store;
-  } else {
-    registry.unshift(store);
+  
+  try {
+    const existing = await db.select().from(storeRegistry).where(eq(storeRegistry.address, store.address)).limit(1);
+    const data = {
+      address: store.address,
+      storeName: store.storeName ?? '',
+      avatarUrl: store.avatarUrl ?? '',
+      bannerUrl: store.bannerUrl ?? '',
+      neonColor: store.neonColor ?? '',
+      tier: store.tier ?? 0,
+      productCount: store.productCount ?? 0,
+    };
+    if (existing.length > 0) {
+      await db.update(storeRegistry).set(data).where(eq(storeRegistry.address, store.address));
+    } else {
+      await db.insert(storeRegistry).values(data);
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error writing store registry to DB:', error);
+    res.status(500).json({ error: 'Database error' });
   }
-  writeRegistry(registry);
-  res.json({ ok: true });
 });
 
 export default router;
