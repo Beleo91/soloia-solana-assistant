@@ -1,33 +1,29 @@
 import { Router, type Request, type Response } from 'express';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { db, itemImages } from '@workspace/db';
+import { eq } from 'drizzle-orm';
 
 const router = Router();
-const MAP_FILE = join(process.cwd(), 'uploads', 'image-map.json');
-
-type ImageMap = Record<string, string[]>;
-
-function readMap(): ImageMap {
-  if (!existsSync(MAP_FILE)) return {};
-  try {
-    return JSON.parse(readFileSync(MAP_FILE, 'utf-8')) as ImageMap;
-  } catch {
-    return {};
-  }
-}
-
-function writeMap(map: ImageMap) {
-  writeFileSync(MAP_FILE, JSON.stringify(map), 'utf-8');
-}
 
 // GET /api/images/map — return all known item→urls mappings
-router.get('/images/map', (_req: Request, res: Response) => {
-  res.json(readMap());
+router.get('/images/map', async (_req: Request, res: Response) => {
+  try {
+    const records = await db.select().from(itemImages);
+    const map: Record<string, string[]> = {};
+    for (const r of records) {
+      if (r.urls && r.urls.length > 0) {
+        map[String(r.itemId)] = r.urls as string[];
+      }
+    }
+    res.json(map);
+  } catch (error) {
+    console.error('Error reading image map from DB:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // POST /api/images/map — upsert urls for an item
 // Body: { itemId: number, urls: string[] }
-router.post('/images/map', (req: Request, res: Response) => {
+router.post('/images/map', async (req: Request, res: Response) => {
   const { itemId, urls } = req.body as { itemId?: unknown; urls?: unknown };
   if (typeof itemId !== 'number' || !Array.isArray(urls)) {
     res.status(400).json({ error: 'itemId (number) and urls (string[]) required' });
@@ -38,10 +34,20 @@ router.post('/images/map', (req: Request, res: Response) => {
     res.status(400).json({ error: 'No valid hosted URLs provided' });
     return;
   }
-  const map = readMap();
-  map[String(itemId)] = validUrls;
-  writeMap(map);
-  res.json({ ok: true });
+  
+  try {
+    // If it exists, update it. If not, insert it.
+    const existing = await db.select().from(itemImages).where(eq(itemImages.itemId, itemId)).limit(1);
+    if (existing.length > 0) {
+      await db.update(itemImages).set({ urls: validUrls }).where(eq(itemImages.itemId, itemId));
+    } else {
+      await db.insert(itemImages).values({ itemId, urls: validUrls });
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error writing image map to DB:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 export default router;
