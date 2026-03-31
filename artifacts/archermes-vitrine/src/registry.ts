@@ -39,6 +39,10 @@ export function getNeonShadow(color: string): string {
 }
 
 function getApiBase(): string {
+  const envUrl = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`;
+  }
   if (typeof window !== 'undefined') return `${window.location.origin}/api`;
   return '';
 }

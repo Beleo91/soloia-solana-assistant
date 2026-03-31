@@ -17,6 +17,10 @@ const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
 const MAX_IMAGE_BYTES = 500 * 1024; // 500 KB
 
 function getApiUrl(): string {
+  const envUrl = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL;
+  if (envUrl) {
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`;
+  }
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/api`;
   }

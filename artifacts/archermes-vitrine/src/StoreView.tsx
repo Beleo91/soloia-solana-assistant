@@ -45,6 +45,7 @@ interface Props {
   allItems: StoreItem[];
   sellersPro: Set<string>;
   isConnected: boolean;
+  walletAddress?: string;
   onVoltar: () => void;
   onAbrirCompra: (item: StoreItem) => void;
   t: (key: string) => string;
@@ -57,6 +58,7 @@ export default function StoreView({
   allItems,
   sellersPro,
   isConnected,
+  walletAddress,
   onVoltar,
   onAbrirCompra,
   t,
@@ -493,30 +495,48 @@ export default function StoreView({
                         </span>
                       )}
                     </p>
-                    <button
-                      onClick={() => onAbrirCompra(item)}
-                      style={{
-                        width: '100%', padding: '0.6rem 0.5rem',
-                        borderRadius: '0.5rem',
-                        fontFamily: "'Orbitron', sans-serif", fontSize: '0.62rem',
-                        fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer',
-                        transition: 'all 0.18s',
-                        border: `1px solid ${cardNeon}`,
-                        background: `${cardNeon}18`,
-                        color: cardNeon,
-                        boxShadow: `0 0 12px ${cardShadow}`,
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = `${cardNeon}30`;
-                        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 20px ${cardShadow}`;
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLButtonElement).style.background = `${cardNeon}18`;
-                        (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 12px ${cardShadow}`;
-                      }}
-                    >
-                      {isConnected ? t('vitrine.buyNow') : t('vitrine.connectToBuy')}
-                    </button>
+                    {walletAddress?.toLowerCase() === item.seller.toLowerCase() ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); alert(lang === 'en' ? 'Edit feature coming soon!' : 'Editar produto em breve!'); }}
+                        style={{
+                          width: '100%', padding: '0.6rem 0.5rem',
+                          borderRadius: '0.5rem',
+                          fontFamily: "'Orbitron', sans-serif", fontSize: '0.62rem',
+                          fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer',
+                          transition: 'all 0.18s',
+                          border: `1px solid #facc15`,
+                          background: `rgba(250,204,21,0.05)`,
+                          color: '#facc15',
+                        }}
+                      >
+                        ✏️ {lang === 'en' ? 'Edit Product' : 'Editar Produto'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onAbrirCompra(item)}
+                        style={{
+                          width: '100%', padding: '0.6rem 0.5rem',
+                          borderRadius: '0.5rem',
+                          fontFamily: "'Orbitron', sans-serif", fontSize: '0.62rem',
+                          fontWeight: 700, letterSpacing: '0.1em', cursor: 'pointer',
+                          transition: 'all 0.18s',
+                          border: `1px solid ${cardNeon}`,
+                          background: `${cardNeon}18`,
+                          color: cardNeon,
+                          boxShadow: `0 0 12px ${cardShadow}`,
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = `${cardNeon}30`;
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 20px ${cardShadow}`;
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLButtonElement).style.background = `${cardNeon}18`;
+                          (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 12px ${cardShadow}`;
+                        }}
+                      >
+                        {isConnected ? t('vitrine.buyNow') : t('vitrine.connectToBuy')}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

@@ -1019,6 +1019,7 @@ export default function HomePage() {
           allItems={vitrine as StoreItem[]}
           sellersPro={sellersPro}
           isConnected={isConnected}
+          walletAddress={walletAddress}
           onVoltar={() => setPagina('home')}
           onAbrirCompra={(item) => abrirCompra(item as ItemBlockchain)}
           t={t}
@@ -1962,6 +1963,14 @@ export default function HomePage() {
                       style={{ opacity: 0.45, cursor: 'not-allowed', letterSpacing: '0.12em' }}
                     >
                       {lang === 'en' ? '⛔ OUT OF STOCK' : '⛔ ESGOTADO'}
+                    </button>
+                  ) : walletAddress?.toLowerCase() === item.seller.toLowerCase() ? (
+                    <button
+                      className="btn-neon btn-neon-full"
+                      style={{ borderColor: '#facc15', color: '#facc15', background: 'rgba(250,204,21,0.05)' }}
+                      onClick={(e) => { e.stopPropagation(); alert(lang === 'en' ? 'Edit feature coming soon!' : 'Editar produto em breve!'); }}
+                    >
+                      <span>✏️ {lang === 'en' ? 'Edit Product' : 'Editar Produto'}</span>
                     </button>
                   ) : (
                     <button
