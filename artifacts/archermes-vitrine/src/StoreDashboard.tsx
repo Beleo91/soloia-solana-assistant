@@ -183,30 +183,31 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   function salvarCustomizacao(next: Customizacao) {
     setCustomizacao(next);
     try { localStorage.setItem(`${LS_KEY}_${enderecoUsuario}`, JSON.stringify(next)); } catch { /* ignore */ }
-    if (loja?.storeName && enderecoUsuario) {
+    if (enderecoUsuario) {
       saveStoreToRegistry({
         address: enderecoUsuario,
-        storeName: loja.storeName,
+        storeName: loja?.storeName || `Loja de ${enderecoUsuario.slice(0,6)}`,
         avatarUrl: next.avatarUrl,
         bannerUrl: next.bannerUrl,
         neonColor: next.neonColor,
-        tier: loja.tier,
-        productCount: Number(loja.productCount),
+        tier: loja?.tier || 0,
+        productCount: Number(loja?.productCount || 0),
       });
       broadcastVitrineEvent({ type: 'profile:updated', address: enderecoUsuario });
     }
   }
 
+  // Sincronizar qualquer alteração reativa
   useEffect(() => {
-    if (!enderecoUsuario || !loja?.storeName) return;
+    if (!enderecoUsuario) return;
     saveStoreToRegistry({
       address: enderecoUsuario,
-      storeName: loja.storeName,
+      storeName: loja?.storeName || `Loja de ${enderecoUsuario.slice(0,6)}`,
       avatarUrl: customizacao.avatarUrl,
       bannerUrl: customizacao.bannerUrl,
       neonColor: customizacao.neonColor,
-      tier: loja.tier,
-      productCount: Number(loja.productCount),
+      tier: loja?.tier || 0,
+      productCount: Number(loja?.productCount || 0),
     });
   }, [loja, customizacao, enderecoUsuario]);
 
@@ -224,7 +225,13 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     try {
       const base64 = await fileToBase64(file);
       const result = await uploadImage(base64);
-      salvarCustomizacao({ ...customizacao, bannerUrl: result.url });
+      if (result.ok && result.url) {
+        salvarCustomizacao({ ...customizacao, bannerUrl: result.url });
+      } else if (!result.ok) {
+        alert(result.error || 'Falha ao enviar o banner.');
+      }
+    } catch (e) {
+      alert('Erro ao iniciar o envio da imagem: ' + String(e));
     } finally {
       setConvertingBanner(false);
     }
@@ -235,7 +242,13 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
     try {
       const base64 = await fileToBase64(file);
       const result = await uploadImage(base64);
-      salvarCustomizacao({ ...customizacao, avatarUrl: result.url });
+      if (result.ok && result.url) {
+        salvarCustomizacao({ ...customizacao, avatarUrl: result.url });
+      } else if (!result.ok) {
+        alert(result.error || 'Falha ao enviar o avatar.');
+      }
+    } catch (e) {
+      alert('Erro ao iniciar o envio da imagem: ' + String(e));
     } finally {
       setConvertingAvatar(false);
     }
