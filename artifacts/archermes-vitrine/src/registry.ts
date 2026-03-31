@@ -44,7 +44,7 @@ export function getNeonShadow(color: string): string {
   return NEON_SHADOW[color] ?? 'rgba(0,229,255,0.4)';
 }
 
-function getApiBase(): string {
+export function getApiBase(): string {
   const envUrl = (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_URL;
   if (envUrl) {
     return envUrl.endsWith('/api') ? envUrl : `${envUrl.replace(/\/$/, '')}/api`;

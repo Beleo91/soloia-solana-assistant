@@ -147,27 +147,24 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
   const enderecoUsuario = walletAddress ?? '';
   const isAdmin = enderecoUsuario.toLowerCase() === TREASURY_WALLET.toLowerCase();
 
-  // Carregar customização do banco (se existir) ou do localStorage
+  // Carregar customização do banco (se existir) GLOBAL ao montar a página
   useEffect(() => {
     if (!enderecoUsuario) return;
     
-    // Tenta carregar do backend global primeiro
-    import('./registry').then(({ getStoreRegistry }) => {
-      const stores = getStoreRegistry();
-      const minhaLoja = stores.find(s => s.address.toLowerCase() === enderecoUsuario.toLowerCase());
-      if (minhaLoja) {
-        setCustomizacao({
-          avatarUrl: minhaLoja.avatarUrl,
-          bannerUrl: minhaLoja.bannerUrl,
-          neonColor: minhaLoja.neonColor || '#00e5ff',
-        });
-      } else {
-        // Fallback local
-        try {
-          const saved = localStorage.getItem(`${LS_KEY}_${enderecoUsuario}`);
-          if (saved) setCustomizacao(JSON.parse(saved));
-        } catch { /* ignore */ }
-      }
+    import('./registry').then(async (req) => {
+      try {
+        const stores = await req.fetchRegistryFromServer();
+        req.mergeServerRegistry(stores);
+        
+        const minhaLoja = stores.find(s => s.address.toLowerCase() === enderecoUsuario.toLowerCase());
+        if (minhaLoja && (minhaLoja.avatarUrl || minhaLoja.bannerUrl || minhaLoja.neonColor)) {
+          setCustomizacao({
+            avatarUrl: minhaLoja.avatarUrl,
+            bannerUrl: minhaLoja.bannerUrl,
+            neonColor: minhaLoja.neonColor || '#00e5ff',
+          });
+        }
+      } catch { /* ignore */ }
     });
   }, [enderecoUsuario]);
 
@@ -182,34 +179,50 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
 
   function salvarCustomizacao(next: Customizacao) {
     setCustomizacao(next);
+    // Salva localmente como preview temporário
     try { localStorage.setItem(`${LS_KEY}_${enderecoUsuario}`, JSON.stringify(next)); } catch { /* ignore */ }
-    if (enderecoUsuario) {
-      saveStoreToRegistry({
-        address: enderecoUsuario,
-        storeName: loja?.storeName || `Loja de ${enderecoUsuario.slice(0,6)}`,
-        avatarUrl: next.avatarUrl,
-        bannerUrl: next.bannerUrl,
-        neonColor: next.neonColor,
-        tier: loja?.tier || 0,
-        productCount: Number(loja?.productCount || 0),
-      });
-      broadcastVitrineEvent({ type: 'profile:updated', address: enderecoUsuario });
-    }
   }
 
-  // Sincronizar qualquer alteração reativa
-  useEffect(() => {
+  const [salvandoVisual, setSalvandoVisual] = useState(false);
+
+  async function handleSalvarVisual() {
     if (!enderecoUsuario) return;
-    saveStoreToRegistry({
-      address: enderecoUsuario,
-      storeName: loja?.storeName || `Loja de ${enderecoUsuario.slice(0,6)}`,
-      avatarUrl: customizacao.avatarUrl,
-      bannerUrl: customizacao.bannerUrl,
-      neonColor: customizacao.neonColor,
-      tier: loja?.tier || 0,
-      productCount: Number(loja?.productCount || 0),
-    });
-  }, [loja, customizacao, enderecoUsuario]);
+    setSalvandoVisual(true);
+    try {
+      const nextParam = {
+        address: enderecoUsuario,
+        storeName: loja?.storeName || `Loja de ${enderecoUsuario.slice(0,6)}`,
+        avatarUrl: customizacao.avatarUrl,
+        bannerUrl: customizacao.bannerUrl,
+        neonColor: customizacao.neonColor,
+        tier: loja?.tier || 0,
+        productCount: Number(loja?.productCount || 0),
+      };
+      
+      const { getApiBase, fetchRegistryFromServer, mergeServerRegistry } = await import('./registry');
+      const api = getApiBase();
+      if (!api) throw new Error("API não está configurada");
+      
+      const res = await fetch(`${api}/store-registry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nextParam),
+      });
+      
+      if (!res.ok) throw new Error("Falha no servidor ao persistir os dados");
+      
+      // Sync e Refresh
+      const data = await fetchRegistryFromServer();
+      mergeServerRegistry(data);
+      broadcastVitrineEvent({ type: 'profile:updated', address: enderecoUsuario });
+      
+      alert('Sucesso! As alterações visuais foram salvas na Nuvem.');
+    } catch (err) {
+      alert('Erro ao Salvar Alterações: ' + String(err));
+    } finally {
+      setSalvandoVisual(false);
+    }
+  }
 
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -1741,9 +1754,39 @@ export default function StoreDashboard({ onVoltar, onAnunciar }: { onVoltar: () 
                     </button>
                   ))}
                 </div>
-                <p className="text-white/20 text-xs">
-                  {lang === 'en' ? 'Neon color is saved locally and personalizes your panel.' : 'A cor do neon é salva localmente e personaliza seu painel.'}
+                <p className="text-white/20 text-xs mt-2">
+                  {lang === 'en' ? 'Neon color personalizes your whole store identity.' : 'A cor do neon personaliza toda a identidade visual da sua loja.'}
                 </p>
+              </div>
+
+              {/* BOTÃO SALVAR ALTERAÇÕES (EXPLÍCITO) */}
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={handleSalvarVisual}
+                  disabled={salvandoVisual}
+                  className="group relative px-8 py-3 rounded-xl font-black tracking-widest uppercase overflow-hidden transition-all flex items-center gap-2"
+                  style={{
+                    fontFamily: "'Orbitron', sans-serif",
+                    background: salvandoVisual ? 'rgba(255,255,255,0.05)' : `${customizacao.neonColor}20`,
+                    color: salvandoVisual ? 'rgba(255,255,255,0.4)' : customizacao.neonColor,
+                    border: `1px solid ${salvandoVisual ? 'rgba(255,255,255,0.1)' : customizacao.neonColor}`,
+                    boxShadow: salvandoVisual ? 'none' : `0 0 15px ${neonAtual.shadow}, inset 0 0 10px ${neonAtual.shadow}`,
+                    cursor: salvandoVisual ? 'not-allowed' : 'pointer'
+                  }}>
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+                       style={{ background: `linear-gradient(45deg, transparent, ${customizacao.neonColor}, transparent)` }} />
+                  {salvandoVisual ? (
+                    <>
+                      <span className="spinner">↻</span>
+                      {lang === 'en' ? 'SAVING...' : 'SALVANDO...'}
+                    </>
+                  ) : (
+                    <>
+                      <span>💾</span>
+                      {lang === 'en' ? 'SAVE CHANGES' : 'SALVAR ALTERAÇÕES'}
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
