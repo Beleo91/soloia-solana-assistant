@@ -588,7 +588,7 @@ export default function SOLOIAPage() {
       <footer className="mt-auto pt-16 flex flex-col items-center">
          <div className="flex items-center gap-4 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
             <span className="font-jetbrains text-[10px] text-white/30 uppercase tracking-[0.2em]">
-               Superteam Brazil Bounty Submission
+               Superteam Brazil
             </span>
             <div className="w-px h-3 bg-white/10" />
             <div className="flex items-center gap-1.5 grayscale opacity-50 contrast-125">
