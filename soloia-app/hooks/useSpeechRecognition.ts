@@ -64,6 +64,7 @@ interface UseSpeechRecognitionOptions {
   onStart?: () => void;
   onEnd?: () => void;
   onAudioLevel?: (level: number) => void;
+  lang?: "en" | "pt";
 }
 
 export function useSpeechRecognition({
@@ -72,6 +73,7 @@ export function useSpeechRecognition({
   onStart,
   onEnd,
   onAudioLevel,
+  lang = "en",
 }: UseSpeechRecognitionOptions) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -168,15 +170,31 @@ export function useSpeechRecognition({
     };
 
     recognition.onerror = (event: ISpeechRecognitionErrorEvent) => {
-      const messages: Record<string, string> = {
-        "not-allowed": "Microphone access denied. Please allow microphone permissions.",
-        "no-speech": "No speech detected. Try again.",
-        "audio-capture": "No microphone found.",
-        network: "Network error during speech recognition.",
-        aborted: "",
+      const messages: Record<string, Record<string, string>> = {
+        "not-allowed": {
+          pt: "Microfone não detectado ou permissão negada. Por favor, digite sua busca na barra abaixo.",
+          en: "Microphone not detected or permission denied. Please type your search in the bar below.",
+        },
+        "no-speech": {
+          pt: "Nenhuma fala detectada. Tente novamente.",
+          en: "No speech detected. Try again.",
+        },
+        "audio-capture": {
+          pt: "Microfone não detectado. Por favor, digite sua busca na barra abaixo.",
+          en: "Microphone not detected. Please type your search in the bar below.",
+        },
+        network: {
+          pt: "Erro de rede durante o reconhecimento de voz.",
+          en: "Network error during speech recognition.",
+        },
       };
-      const msg = messages[event.error] ?? `Speech error: ${event.error}`;
-      if (msg) onError?.(msg);
+
+      const msgObj = messages[event.error];
+      const msg = msgObj ? msgObj[lang] : (lang === 'pt' ? `Erro de fala: ${event.error}` : `Speech error: ${event.error}`);
+      
+      if (event.error !== "aborted") {
+        onError?.(msg);
+      }
     };
 
     recognition.onend = () => {

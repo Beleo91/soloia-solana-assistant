@@ -267,6 +267,7 @@ export default function SOLOIAPage() {
         if (orbState === "listening") setOrbState("idle");
       },
       onAudioLevel: setAudioLevel,
+      lang: locale,
     });
 
   const handleOrbClick = useCallback(() => {

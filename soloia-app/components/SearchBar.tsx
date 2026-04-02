@@ -135,16 +135,16 @@ export function SearchBar({ onSearch, isDisabled, placeholder }: SearchBarProps)
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -5 }}
-              className="absolute top-full mt-4 flex flex-col items-center gap-1.5"
+              className="absolute top-full mt-12 flex flex-col items-center gap-1.5"
             >
               <motion.div 
-                animate={{ y: [0, 4, 0] }}
+                animate={{ y: [0, 6, 0] }}
                 transition={{ repeat: Infinity, duration: 1.5 }}
                 className="text-[#14f195]"
               >
-                <Search size={14} className="rotate-90" />
+                <Search size={18} className="rotate-90 drop-shadow-[0_0_8px_rgba(20,241,149,0.5)]" />
               </motion.div>
-              <span className="font-jetbrains text-[9px] uppercase tracking-[0.2em] text-[#14f195] font-bold whitespace-nowrap">
+              <span className="font-jetbrains text-[10px] uppercase tracking-[0.3em] text-[#14f195] font-black whitespace-nowrap drop-shadow-[0_0_10px_rgba(20,241,149,0.3)]">
                 Aperte aqui para ver a resposta
               </span>
             </motion.div>
