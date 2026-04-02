@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { Search, X } from "lucide-react";
 
@@ -107,16 +107,50 @@ export function SearchBar({ onSearch, isDisabled, placeholder }: SearchBarProps)
       </motion.div>
 
       {/* ── CENTRALIZED SOLANA BUSCAR BUTTON ────────────────────────── */}
-      <motion.button
-        onClick={handleManualSearch}
-        disabled={!value.trim() || isDisabled}
-        className="btn-solana w-40 disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden"
-        whileHover={value.trim() ? { scale: 1.05 } : {}}
-        whileTap={value.trim() ? { scale: 0.95 } : {}}
-      >
-        <span className="relative z-10">BUSCAR</span>
-        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
-      </motion.button>
+      <div className="relative group flex flex-col items-center">
+        <motion.button
+          onClick={handleManualSearch}
+          disabled={!value.trim() || isDisabled}
+          className="btn-solana w-48 disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden h-14"
+          whileHover={value.trim() ? { scale: 1.05, boxShadow: "0 0 20px rgba(20,241,149,0.4)" } : {}}
+          whileTap={value.trim() ? { scale: 0.95 } : {}}
+          animate={value.trim() && !isDisabled ? { 
+            scale: [1, 1.02, 1],
+            boxShadow: [
+              "0 0 10px rgba(153,69,255,0.2)",
+              "0 0 25px rgba(20,241,149,0.3)",
+              "0 0 10px rgba(153,69,255,0.2)"
+            ] 
+          } : {}}
+          transition={{ repeat: Infinity, duration: 2 }}
+        >
+          <span className="relative z-10 font-black tracking-[0.2em]">{isDisabled ? 'PROCESSANDO...' : 'BUSCAR'}</span>
+          <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+        </motion.button>
+
+        {/* Dynamic Hint for User Guidance */}
+        <AnimatePresence>
+          {value.trim() && !isDisabled && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              className="absolute top-full mt-4 flex flex-col items-center gap-1.5"
+            >
+              <motion.div 
+                animate={{ y: [0, 4, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="text-[#14f195]"
+              >
+                <Search size={14} className="rotate-90" />
+              </motion.div>
+              <span className="font-jetbrains text-[9px] uppercase tracking-[0.2em] text-[#14f195] font-bold whitespace-nowrap">
+                Aperte aqui para ver a resposta
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ export const PT_TRANSLATIONS: Record<string, { term: string; definition: string 
   },
   "pda": {
     "term": "PDA (Program Derived Address)",
-    "definition": "Um Endereço Derivado de Programa. São endereços que não possuem uma chave privada correspondente e são controlados exclusivamente por um programa específico. São fundamentais para criar cofres e estados de dados seguros na Solana."
+    "definition": "Um Endereço Derivado de Programa. São endereços que não possuem uma chave privada correspondente e são controlados exclusivamente por um programa específico. São fundamentais para criar estados de dados seguros na Solana."
   },
   "account": {
     "term": "Conta (Account)",
@@ -132,5 +132,61 @@ export const PT_TRANSLATIONS: Record<string, { term: string; definition: string 
   "sysvar": {
     "term": "Sysvar",
     "definition": "Contas especiais do sistema Solana que contêm informações dinâmicas sobre a rede, como o relógio (Clock), taxas (Fees) e recompensas (Rent)."
+  },
+  "ed25519": {
+    "term": "Ed25519",
+    "definition": "O algoritmo de assinatura digital de curva elíptica usado pela Solana para todas as assinaturas de transações. É ultra-rápido, seguro e gera assinaturas de 64 bytes com chaves públicas de 32 bytes."
+  },
+  "base58": {
+    "term": "Base58",
+    "definition": "O esquema de codificação de texto usado pela Solana para representar chaves públicas e assinaturas. É similar ao Base64, mas remove caracteres confusos como 0 (zero), O (o maiúsculo), I (i maiúsculo) e l (L minúsculo)."
+  },
+  "transaction": {
+    "term": "Transação (Transaction)",
+    "definition": "Um pacote de instruções assinado que solicita a execução de lógica na blockchain. As transações na Solana são atômicas: ou todas as instruções funcionam, ou nenhuma é aplicada."
+  },
+  "instruction": {
+    "term": "Instrução (Instruction)",
+    "definition": "A menor unidade de lógica operacional na Solana. Uma transação pode conter múltiplas instruções, cada uma chamando um programa diferente."
+  },
+  "slot": {
+    "term": "Slot",
+    "definition": "A unidade básica de tempo na Solana, durando aproximadamente 400 milissegundos. É o período durante o qual um líder de rede pode produzir um bloco."
+  },
+  "epoch": {
+    "term": "Epoch (Época)",
+    "definition": "Um período de tempo que dura aproximadamente 2 a 3 dias (432.000 slots). Ao final de cada epoch, a rede recalcula as recompensas de stake e a lista de validadores."
+  },
+  "bpf": {
+    "term": "BPF / eBPF",
+    "definition": "Berkeley Packet Filter. É a arquitetura de baixo nível que a Solana utiliza para executar programas (smart contracts) de forma eficiente e segura diretamente no kernel da rede."
+  },
+  "compute-budget": {
+    "term": "Orçamento de Computação",
+    "definition": "O limite de recursos (unidades de computação) que uma transação pode consumir. Desenvolvedores podem pagar taxas de prioridade para aumentar esse limite em transações complexas."
+  },
+  "program-derived-address": {
+    "term": "PDA (Program Derived Address)",
+    "definition": "Endereços derivados deterministicamente de um programa e de 'seeds', permitindo que o programa assine transações sem precisar de uma chave privada comum."
+  },
+  "cross-program-invocation": {
+    "term": "CPI (Invocação entre Programas)",
+    "definition": "O processo pelo qual um programa Solana chama outro programa. Isso permite a composição de protocolos, como um programa DeFi chamando o Token Program."
+  },
+  "associated-token-account": {
+    "term": "ATA (Associated Token Account)",
+    "definition": "Uma conta de token cujo endereço é derivado da chave pública do usuário e do mint do token, garantindo que cada usuário tenha um endereço padrão para cada token."
+  },
+  "mainnet-beta": {
+    "term": "Mainnet Beta",
+    "definition": "A rede de produção principal da Solana, onde ativos reais são transacionados."
+  },
+  "cluster": {
+    "term": "Cluster",
+    "definition": "Um conjunto de computadores (validadores) que trabalham juntos para manter um registro compartilhado de transações (ex: Mainnet, Devnet)."
+  },
+  "ledger": {
+    "term": "Ledger (Livro-Razão)",
+    "definition": "O registro histórico completo de todas as transações que já ocorreram em um cluster Solana."
   }
 };

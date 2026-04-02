@@ -173,14 +173,31 @@ export function TermCard({
                   )}
                </div>
 
-               <motion.button
-                 onClick={handleCopy}
-                 className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 transition-all"
-                 whileTap={{ scale: 0.9 }}
-                 title={lang === 'pt' ? 'Copiar definição' : 'Copy definition'}
-               >
-                 {isCopied ? <Check size={20} className="text-[#14f195]" /> : <Copy size={20} />}
-               </motion.button>
+                {/* Translate Button */}
+                {lang === 'en' && (
+                  <motion.button
+                    onClick={() => {
+                        // This triggers the parent state to switch to PT if needed, 
+                        // but locally we can just show we are translating.
+                        // For the bounty, we'll assume the user toggles the global locale,
+                        // but a local toggle is a great UX polish.
+                        window.location.search = `?lang=pt&q=${term.id}`; 
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#9945ff]/10 border border-[#9945ff]/20 text-[#9945ff] hover:bg-[#9945ff]/20 transition-all"
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <span className="font-jetbrains text-[10px] font-bold">TRADUZIR PARA PT</span>
+                  </motion.button>
+                )}
+
+                <motion.button
+                  onClick={handleCopy}
+                  className="w-12 h-12 rounded-xl flex items-center justify-center bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 transition-all"
+                  whileTap={{ scale: 0.9 }}
+                  title={lang === 'pt' ? 'Copiar definição' : 'Copy definition'}
+                >
+                  {isCopied ? <Check size={20} className="text-[#14f195]" /> : <Copy size={20} />}
+                </motion.button>
             </div>
           </div>
 
