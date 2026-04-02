@@ -29,6 +29,8 @@ const PLATFORM_FEE_PERCENT = 3n;
 const REFERRAL_FEE_PERCENT = 2n;
 
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost', 'Casa', 'NFT', 'Criança', 'Outros'];
+const GAMER_CATEGORIES = ['Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost'];
+
 
 type Moeda = 'ETH' | StablecoinSymbol;
 
@@ -758,6 +760,13 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vitrine, itemDaUrl]);
 
+  // Resetar categoria se Modo Gamer for desativado
+  useEffect(() => {
+    if (!isGamingMode && GAMER_CATEGORIES.includes(filtroCategoria)) {
+      setFiltroCategoria('Todos');
+    }
+  }, [isGamingMode, filtroCategoria]);
+
   function abrirModal() {
     setEstado('idle'); setTxHash(''); setErroMsg('');
     setForm({ nomeItem: '', preco: '', categoria: CATEGORIAS[0] });
@@ -1000,8 +1009,14 @@ export default function HomePage() {
     }
   }
 
+  const vitrineBase = isGamingMode 
+    ? vitrine 
+    : vitrine.filter((i) => !GAMER_CATEGORIES.includes(i.category));
+
   const vitrineVisivel = filtroCategoria === 'Todos'
-    ? vitrine : vitrine.filter((i) => i.category === filtroCategoria);
+    ? vitrineBase 
+    : vitrineBase.filter((i) => i.category === filtroCategoria);
+
 
   // ── PÁGINA SECUNDÁRIA ──
   if (pagina === 'loja-view') {
@@ -1018,6 +1033,7 @@ export default function HomePage() {
           onAbrirCompra={(item) => abrirCompra(item as ItemBlockchain)}
           t={t}
           lang={lang}
+          isGamingMode={isGamingMode}
         />
         {/* Buy modal available from StoreView too */}
         {itemParaComprar && (
@@ -1776,7 +1792,7 @@ export default function HomePage() {
 
         {vitrine.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-6">
-            {['Todos', ...CATEGORIAS].map((cat) => (
+            {['Todos', ...CATEGORIAS].filter(cat => isGamingMode || !GAMER_CATEGORIES.includes(cat)).map((cat) => (
               <button key={cat} onClick={() => setFiltroCategoria(cat)}
                 className={`text-[11px] px-3 py-1.5 rounded-full border transition-all duration-200
                   tracking-widest uppercase ${filtroCategoria === cat
@@ -2018,7 +2034,9 @@ export default function HomePage() {
           {([['👕', lang === 'en' ? 'Fashion' : 'Moda', 'Moda'],
              ['📱', lang === 'en' ? 'Electronics' : 'Eletrônicos', 'Eletrônicos'],
              ['💧', lang === 'en' ? 'Perfumes & Beauty' : 'Perfumes e Beleza', 'Perfumes e Beleza'],
-             ['🎮', 'Games', 'Games']] as [string, string, string][]).map(([icone, label, filtroVal]) => (
+             ['🎮', 'Games', 'Games']] as [string, string, string][])
+             .filter(([,,val]) => isGamingMode || !GAMER_CATEGORIES.includes(val))
+             .map(([icone, label, filtroVal]) => (
             <button key={filtroVal} className="btn-nicho" onClick={() => setFiltroCategoria(filtroVal)}>
               <span className="icone">{icone}</span> {label}
             </button>
@@ -2066,7 +2084,9 @@ export default function HomePage() {
                       style={{ background: 'rgba(255,255,255,0.05)', color: '#fff',
                         border: '1px solid rgba(0,229,255,0.18)', borderRadius: '8px',
                         padding: '0.65rem 1rem', width: '100%', fontSize: '0.9rem', outline: 'none' }}>
-                      {CATEGORIAS.map((c) => <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>)}
+                      {CATEGORIAS.filter(cat => isGamingMode || !GAMER_CATEGORIES.includes(cat)).map((c) => (
+                        <option key={c} value={c} style={{ background: '#0c1022' }}>{c}</option>
+                      ))}
                     </select>
                   </div>
 

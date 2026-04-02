@@ -18,6 +18,8 @@ export interface StoreItem {
 type SortOrder = 'default' | 'price-asc' | 'price-desc';
 
 const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost', 'Casa', 'Outros'];
+const GAMER_CATEGORIES = ['Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost'];
+
 
 function abreviarEndereco(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -50,7 +52,9 @@ interface Props {
   onAbrirCompra: (item: StoreItem) => void;
   t: (key: string) => string;
   lang: 'en' | 'pt';
+  isGamingMode: boolean;
 }
+
 
 export default function StoreView({
   storeAddress,
@@ -63,7 +67,9 @@ export default function StoreView({
   onAbrirCompra,
   t,
   lang,
+  isGamingMode,
 }: Props) {
+
   const [busca, setBusca] = useState('');
   const [categoriaSel, setCategoriaSel] = useState('Todos');
   const [sortOrder, setSortOrder] = useState<SortOrder>('default');
@@ -79,12 +85,15 @@ export default function StoreView({
   const storeName = storeInfo?.storeName ?? (isValidAddress ? abreviarEndereco(storeAddress) : storeAddress);
 
   const storeItems = useMemo(
-    () =>
-      isValidAddress
+    () => {
+      const base = isValidAddress
         ? allItems.filter((item) => item.seller.toLowerCase() === storeAddress.toLowerCase())
-        : [],
-    [allItems, storeAddress, isValidAddress],
+        : [];
+      return isGamingMode ? base : base.filter(i => !GAMER_CATEGORIES.includes(i.category));
+    },
+    [allItems, storeAddress, isValidAddress, isGamingMode],
   );
+
 
   const filtered = useMemo(() => {
     let items = storeItems;
@@ -267,7 +276,7 @@ export default function StoreView({
             {lang === 'en' ? 'ALL' : 'TODOS'}
           </button>
 
-          {CATEGORIAS.map((cat) => {
+          {CATEGORIAS.filter(cat => isGamingMode || !GAMER_CATEGORIES.includes(cat)).map((cat) => {
             const isActive = categoriaSel === cat;
             return (
               <button
