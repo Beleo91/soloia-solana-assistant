@@ -22,7 +22,8 @@ import {
   Volume2, 
   ExternalLink,
   ChevronRight,
-  Info
+  Info,
+  X
 } from "lucide-react";
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -289,9 +290,18 @@ export default function SOLOIAPage() {
 
   const toggleLocale = () => {
     setLocale((prev) => (prev === "pt" ? "en" : "pt"));
+    handleClearResults();
+  };
+
+  const handleClearResults = useCallback(() => {
     setTermResult(null);
     setSearchResults([]);
-  };
+    setIsMultiResult(false);
+    setOrbState("idle");
+    setTranscript("");
+    setKeyword("");
+    setVoiceError("");
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -520,7 +530,26 @@ export default function SOLOIAPage() {
             </AnimatePresence>
 
             {/* Result area */}
-            <div ref={resultRef} className="w-full max-w-2xl px-6 flex flex-col items-center gap-4">
+            <div ref={resultRef} className="w-full max-w-2xl px-6 flex flex-col items-center gap-6 mt-4">
+              <AnimatePresence mode="wait">
+                {(termResult || isMultiResult) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex justify-center w-full"
+                  >
+                    <button
+                      onClick={handleClearResults}
+                      className="btn-outline flex items-center gap-2 text-[10px] uppercase tracking-widest py-1.5 px-4"
+                    >
+                      <X size={12} />
+                      {locale === 'pt' ? 'Limpar Resultados' : 'Clear Results'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <AnimatePresence mode="wait">
                 {termResult && !isMultiResult && (
                   <TermCard
