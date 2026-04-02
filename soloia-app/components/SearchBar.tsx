@@ -70,13 +70,26 @@ export function SearchBar({ onSearch, isDisabled, placeholder }: SearchBarProps)
             }}
           />
 
+          {/* OK / Checkmark button (Tactical confirmation) */}
+          {value.trim() && (
+            <motion.button
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={handleManualSearch}
+              className="mr-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#9945ff]/20 border border-[#9945ff]/40 text-[#14f195] hover:bg-[#9945ff]/30 transition-all font-jetbrains text-[10px] font-bold"
+            >
+              <span>OK</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-[#14f195] animate-pulse" />
+            </motion.button>
+          )}
+
           {/* Clear button */}
           {value && (
             <motion.button
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               onClick={handleClear}
-              className="px-4 flex-shrink-0 text-white/40 hover:text-white transition-colors"
+              className="px-4 flex-shrink-0 text-white/40 hover:text-white transition-colors border-l border-white/5"
             >
               <X size={18} />
             </motion.button>
