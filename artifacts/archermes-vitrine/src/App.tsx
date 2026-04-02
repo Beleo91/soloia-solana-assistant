@@ -2,6 +2,7 @@ import { PrivyProvider } from '@privy-io/react-auth';
 import { arcTestnet } from './chains';
 import { WalletProvider } from './walletContext';
 import { LangProvider } from './i18n';
+import { GamerProvider } from './GamerContext';
 import HomePage from './HomePage';
 
 function App() {
@@ -26,7 +27,9 @@ function App() {
     >
       <WalletProvider>
         <LangProvider>
-          <HomePage />
+          <GamerProvider>
+            <HomePage />
+          </GamerProvider>
         </LangProvider>
       </WalletProvider>
     </PrivyProvider>

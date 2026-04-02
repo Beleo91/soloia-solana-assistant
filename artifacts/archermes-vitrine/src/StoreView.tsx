@@ -17,7 +17,7 @@ export interface StoreItem {
 
 type SortOrder = 'default' | 'price-asc' | 'price-desc';
 
-const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'Outros'];
+const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost', 'Casa', 'Outros'];
 
 function abreviarEndereco(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;

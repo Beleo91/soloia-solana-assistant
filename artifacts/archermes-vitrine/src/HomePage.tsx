@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type DragEvent, type ChangeEv
 import { BrowserProvider, Contract, Interface, JsonRpcProvider, parseUnits, formatUnits } from 'ethers';
 import { useWallet } from './walletContext';
 import { useLang } from './i18n';
+import { useGamer } from './GamerContext';
 import { arcTestnet } from './chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './contract';
 import {
@@ -27,7 +28,7 @@ const PLATFORM_FEE_PERCENT = 3n;
 /** Must stay in sync with on-chain referralFeePercent — v3 contract uses 2. */
 const REFERRAL_FEE_PERCENT = 2n;
 
-const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Casa', 'NFT', 'Criança', 'Outros'];
+const CATEGORIAS = ['Moda', 'Eletrônicos', 'Perfumes e Beleza', 'Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost', 'Casa', 'NFT', 'Criança', 'Outros'];
 
 type Moeda = 'ETH' | StablecoinSymbol;
 
@@ -269,6 +270,7 @@ function resetTilt(e: React.MouseEvent<HTMLDivElement>) {
 export default function HomePage() {
   const { connect, disconnect, isConnected, isConnecting, address: walletAddress, switchToArc, getProvider, error: walletError, clearError: clearWalletError } = useWallet();
   const { t, lang, toggleLang } = useLang();
+  const { isGamingMode, toggleGamingMode } = useGamer();
 
   const [pagina, setPagina] = useState<Pagina>('home');
   const [lojaAtiva, setLojaAtiva] = useState<string>('');
@@ -1050,24 +1052,37 @@ export default function HomePage() {
                   <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.15rem' }}>{itemParaComprar.itemName}</p>
                   <p className="text-white/30 text-xs font-mono">{t('vitrine.seller')} {abreviarEndereco(itemParaComprar.seller)}</p>
 
-                  {/* Endereço de entrega */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-white/50 tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif" }}>
-                      📦 {lang === 'en' ? 'Delivery Address' : 'Endereço de Entrega'} <span style={{ color: '#f87171' }}>*</span>
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={enderecoEntrega}
-                      onChange={(e) => setEnderecoEntrega(e.target.value)}
-                      placeholder={lang === 'en' ? 'Street, number, city, state, ZIP…' : 'Rua, número, bairro, cidade, estado, CEP…'}
-                      disabled={buyEstado === 'confirmando'}
-                      style={{
-                        width: '100%', borderRadius: '0.5rem', resize: 'none', outline: 'none',
-                        background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,229,255,0.2)',
-                        color: '#fff', fontSize: '0.78rem', padding: '0.5rem 0.75rem', fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
+                  {/* Endereço de entrega - Hidden for Gamer Categories */}
+                  {!['Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost'].includes(itemParaComprar.category) ? (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] text-white/50 tracking-widest uppercase" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        📦 {lang === 'en' ? 'Delivery Address' : 'Endereço de Entrega'} <span style={{ color: '#f87171' }}>*</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={enderecoEntrega}
+                        onChange={(e) => setEnderecoEntrega(e.target.value)}
+                        placeholder={lang === 'en' ? 'Street, number, city, state, ZIP…' : 'Rua, número, bairro, cidade, estado, CEP…'}
+                        disabled={buyEstado === 'confirmando'}
+                        style={{
+                          width: '100%', borderRadius: '0.5rem', resize: 'none', outline: 'none',
+                          background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(0,229,255,0.2)',
+                          color: '#fff', fontSize: '0.78rem', padding: '0.5rem 0.75rem', fontFamily: 'inherit',
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-lg p-3 border border-[#4ade80]/30 bg-[#4ade80]/10 mb-2">
+                       <p className="text-[10px] font-bold text-[#4ade80] tracking-widest uppercase mb-1" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        ⚡ {lang === 'en' ? 'DIGITAL DELIVERY' : 'ENTREGA DIGITAL'}
+                      </p>
+                      <p className="text-white/40 text-[9px] leading-relaxed">
+                        {lang === 'en' 
+                          ? 'This is a digital product. Delivery will be made via chat or license key after purchase confirmation.'
+                          : 'Este é um produto digital. A entrega será feita via chat ou chave de licença após a confirmação da compra.'}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Resumo de preços */}
                   <div style={{ padding: '0.6rem 0.75rem', background: 'rgba(0,229,255,0.06)', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1160,6 +1175,19 @@ export default function HomePage() {
         <div className="logo-wrapper">
           <img src="/images/logo-ahs.png" alt="ARCHERMES" className="logo-img" />
           <span className="logo-texto">ARCHERMES</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleGamingMode}
+            className={`px-4 py-2 rounded-full font-black text-[10px] tracking-widest uppercase transition-all duration-300 flex items-center gap-2 ${
+              isGamingMode 
+                ? 'bg-[#4ade80]/20 border border-[#4ade80] text-[#4ade80] shadow-[0_0_20px_rgba(74,222,128,0.4)] animate-pulse' 
+                : 'bg-white/5 border border-white/10 text-white/40 hover:border-white/30 hover:bg-white/10'
+            }`}
+            style={{ fontFamily: "'Orbitron', sans-serif" }}
+          >
+            {isGamingMode ? 'MODO GAMER ATIVO 🎮' : 'MODO GAMER 🎮'}
+          </button>
         </div>
         {!isConnected ? (
           <div className="acoes-header">
@@ -2042,18 +2070,31 @@ export default function HomePage() {
                     </select>
                   </div>
 
-                  {/* Estoque (off-chain) */}
-                  <div className="campo">
-                    <label>{lang === 'en' ? 'Stock Quantity' : 'Quantidade em Estoque'}</label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={formEstoque}
-                      onChange={(e) => setFormEstoque(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      placeholder={lang === 'en' ? 'Quantity available' : 'Qtd. disponível'}
-                    />
-                  </div>
+                  {/* Estoque (off-chain) - Hidden for Game Categories */}
+                  {!['Games', 'Skins', 'Contas', 'Game Keys', 'Serviços/Boost'].includes(form.categoria) ? (
+                    <div className="campo">
+                      <label>{lang === 'en' ? 'Stock Quantity' : 'Quantidade em Estoque'}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={formEstoque}
+                        onChange={(e) => setFormEstoque(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        placeholder={lang === 'en' ? 'Quantity available' : 'Qtd. disponível'}
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-lg p-3 border border-[#4ade80]/30 bg-[#4ade80]/10 mb-4">
+                      <p className="text-[10px] font-bold text-[#4ade80] tracking-widest uppercase mb-1" style={{ fontFamily: "'Orbitron', sans-serif" }}>
+                        ⚡ {lang === 'en' ? 'DIGITAL DELIVERY' : 'ENTREGA DIGITAL'}
+                      </p>
+                      <p className="text-white/40 text-[9px] leading-relaxed">
+                        {lang === 'en' 
+                          ? 'This category uses digital delivery via chat/key. Physical address and stock management are disabled for this item.'
+                          : 'Esta categoria utiliza entrega digital via chat/chave. Endereço físico e gestão de estoque estão desativados para este item.'}
+                      </p>
+                    </div>
+                  )}
                   <div className="campo">
                     <label>{t('modal.list.images')}</label>
                     <input

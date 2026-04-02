@@ -155,6 +155,16 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+.gamer-mode {
+  --primary: 142 70% 58%; /* Matrix Green #4ade80 */
+  --primary-foreground: 142 80% 2%;
+  --background: 240 20% 2%; /* Darker background */
+  --card: 240 20% 4%;
+  --border: 240 20% 12%;
+  --ring: 142 70% 58%;
+  --shadow-2xl: 0px 2px 0px 0px hsl(142 70% 58% / 0.5);
+}
+
 @layer base {
   * {
     @apply border-border;
