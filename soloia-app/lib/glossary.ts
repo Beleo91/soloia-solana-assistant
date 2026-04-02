@@ -4,6 +4,8 @@
  * Uses direct JSON imports since the package dist is not built in the GitHub version
  */
 
+import { PT_TRANSLATIONS } from "./translations_pt";
+
 export interface GlossaryTerm {
   id: string;
   term: string;
@@ -104,6 +106,16 @@ export async function loadAllTerms(locale: string = "en"): Promise<GlossaryTerm[
       
       // Merge translations if available
       const localized = terms.map(t => {
+        // Priority 1: Our curated manual PT translations
+        if (locale === "pt" && PT_TRANSLATIONS[t.id]) {
+          return {
+            ...t,
+            term: PT_TRANSLATIONS[t.id].term,
+            definition: PT_TRANSLATIONS[t.id].definition
+          };
+        }
+
+        // Priority 2: Library's PT translations (if provided and valid)
         if (translations[t.id]) {
           return {
             ...t,
